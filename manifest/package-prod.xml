@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Case Manager AI — production deployment manifest.
+
+  Hand-curated. Every member below is named; there is no wildcard, because a
+  wildcard on GenAiPromptTemplate previously swept four unrelated templates and
+  a blocked one into this package.
+
+  NO DATA STORAGE. Morning_Brief__c and Case_Manager_AI_Log__e were removed on
+  2026-08-18 at the user's direction — this feature persists nothing. The morning
+  digest is still computed by CaseManagerAIDigestService, live per request, and
+  Brief_Priority__mdt is kept because a Custom Metadata Type is configuration
+  rather than data and costs no storage.
+
+  DELIBERATELY ABSENT, and each for a reason:
+    Status_Config__mdt                     not in source control anywhere
+    RecordContextProvider(Test)            blocked on Status_Config__mdt and
+                                           PaymentPlan__c.Scheduled_Count__c
+    GenericRecordContextProvider           superseded; queries without USER_MODE
+    AgentforceCaseSummaryController(Test)  grounds on apex://RecordContextProvider
+    agentforceCaseSummary (LWC)            same dependency
+    Case_Executive_Summary (template)      same dependency
+    Bot / GenAiPlannerBundle / GenAiPlugin / GenAiFunction
+                                           the agent is rebuilt in production
+    Agentforcesummary (static resource)    zero bytes, referenced by nothing
+
+  Deploy order is handled by the platform, but note that Brief_Priority__mdt
+  rows ARE the trigger rules: without them no trigger fires at all.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>CaseManagerAIService</members>
+        <members>CaseManagerAIDigestService</members>
+        <members>CaseManagerAIController</members>
+        <members>CaseManagerAIAgentAction</members>
+        <members>CaseManagerAIServiceTest</members>
+        <members>CaseManagerAIDigestServiceTest</members>
+        <members>CaseManagerAIBookAction</members>
+        <members>CaseManagerAIBookActionTest</members>
+        <members>CaseManagerAIActivitySummary</members>
+        <members>CaseManagerAIActivitySummaryTest</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>caseManagerAI</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>Brief_Priority__mdt</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>Brief_Priority.Account_UCC</members>
+        <members>Brief_Priority.Cancellation_Dated</members>
+        <members>Brief_Priority.Field_Updated</members>
+        <members>Brief_Priority.Cancel_Notice</members>
+        <members>Brief_Priority.Customer_Email</members>
+        <members>Brief_Priority.In_Collections</members>
+        <members>Brief_Priority.In_Legal</members>
+        <members>Brief_Priority.Multiple_Plans</members>
+        <members>Brief_Priority.NSF_Count_High</members>
+        <members>Brief_Priority.NSF_Second</members>
+        <members>Brief_Priority.Open_Case_Aging</members>
+        <members>Brief_Priority.Open_Case_Urgent</members>
+        <members>Brief_Priority.Open_Task</members>
+        <members>Brief_Priority.PSI_NSF</members>
+        <members>Brief_Priority.Quick_Note</members>
+        <members>Brief_Priority.UCC_High</members>
+        <members>Brief_Priority.UCC_Medium</members>
+        <name>CustomMetadata</name>
+    </types>
+    <types>
+        <members>Case_Manager_AI_Access</members>
+        <name>PermissionSet</name>
+    </types>
+    <version>67.0</version>
+</Package>

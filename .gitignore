@@ -1,0 +1,42 @@
+# ── Salesforce CLI cache / auth ───────────────────────────────────────────
+.sf/
+.sfdx/
+.localdevserver/
+deploy-options.json
+
+# ── Logs / deps / editor / OS ─────────────────────────────────────────────
+*.log
+node_modules/
+.DS_Store
+Thumbs.db
+.vscode/
+
+# ── NOT part of Case Manager AI ───────────────────────────────────────────
+# Excluded per manifest/package-prod.xml, which names each omission and why.
+# These files still exist locally for deploys; they are simply not in this repo.
+
+# Blocked on Status_Config__mdt + PaymentPlan__c.Scheduled_Count__c
+force-app/main/default/classes/RecordContextProvider.cls*
+force-app/main/default/classes/RecordContextProviderTest.cls*
+force-app/main/default/objects/Status_Config__mdt/
+
+# Superseded; queries without USER_MODE
+force-app/main/default/classes/GenericRecordContextProvider.cls*
+
+# Ground on apex://RecordContextProvider
+force-app/main/default/classes/AgentforceCaseSummaryController.cls*
+force-app/main/default/classes/AgentforceCaseSummaryControllerTest.cls*
+force-app/main/default/lwc/agentforceCaseSummary/
+
+# Unrelated features that happen to share this folder (SAS fee handling)
+force-app/main/default/classes/SASPaymentFeeBatchHelper.cls*
+force-app/main/default/classes/SASPsiClearedFeeHandler.cls*
+
+# Prompt templates: Morning_Brief was removed 2026-08-18 with the stored-brief
+# design; the rest belong to other features. The agent is rebuilt in production,
+# so no Bot / GenAiPlannerBundle / GenAiPlugin / GenAiFunction is tracked here.
+force-app/main/default/genAiPromptTemplates/
+
+# Stale root manifest — still lists Morning_Brief__c, CaseManagerAIBrief*,
+# Status_Config__mdt and permission sets that no longer exist.
+/package.xml

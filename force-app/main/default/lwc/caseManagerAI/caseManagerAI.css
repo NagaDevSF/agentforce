@@ -1,0 +1,344 @@
+.cm-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.cm-scope {
+  margin-left: 0.25rem;
+}
+
+.cm-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cm-error {
+  color: #ba0517;
+  font-size: 0.8125rem;
+}
+
+.cm-loading {
+  position: relative;
+  min-height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* ───────────────────────── morning brief card ───────────────────────── */
+
+/* ONE compartment. This was a two-column card - findings on the left, DO FIRST
+   boxed off on the right - and it read as two separate things to scan. It is a
+   single column now, so the brief is one block from top to bottom. */
+.cm-brief {
+  display: block;
+  background: #ffffff;
+  border: 1px solid #f5dada;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.cm-brief__main {
+  min-width: 0;
+  padding: 1rem 1.125rem 0.25rem;
+}
+
+.cm-brief__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+}
+
+.cm-brief__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #9b2c2c;
+  border-radius: 999px;
+  padding: 0.1875rem 0.5rem;
+}
+
+.cm-brief__badge-icon {
+  --sds-c-icon-color-foreground-default: #ffffff;
+}
+
+.cm-brief__badge-text {
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cm-brief__title {
+  color: #9b2c2c;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.cm-brief__provenance {
+  color: #8a8886;
+  font-size: 0.75rem;
+}
+
+/* Right rail: the vertical divider is the sidebar's own left border, so it
+   stays flush with the card edges regardless of which column is taller. */
+/* Was a boxed-off right-hand panel. Now it simply continues the same column,
+   separated by a rule rather than by a wall. */
+.cm-brief__side {
+  padding: 0.5rem 1.125rem 1rem;
+  border-top: 1px solid #f0efee;
+  margin-top: 0.5rem;
+}
+
+.cm-brief__side-title {
+  color: #9b2c2c;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.cm-brief__action {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+  color: #3b3a39;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.cm-brief__action:last-child {
+  margin-bottom: 0;
+}
+
+.cm-brief__arrow {
+  flex: none;
+  color: #d4462d;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+/* The two columns stop being readable side by side in a narrow region, so the
+   rail drops underneath and its divider becomes a top border. */
+@media (max-width: 40rem) {
+  .cm-brief {
+    flex-direction: column;
+  }
+
+  .cm-brief__side {
+    flex: 1 1 auto;
+    border-left: none;
+    border-top: 1px solid #f5dada;
+  }
+}
+
+.cm-quiet {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0.25rem;
+  font-size: 0.8125rem;
+  color: #514f4d;
+}
+
+/* ── point-wise brief body + AI writing effect ───────────────────────────── */
+
+.cm-brief__points {
+  margin: 0;
+}
+
+.cm-brief__point {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+  color: #3b3a39;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.cm-brief__point:last-child {
+  margin-bottom: 0;
+}
+
+.cm-brief__bullet {
+  flex: none;
+  width: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Arrow drawn in CSS, so it never lands in copied text or a screen reader. */
+.cm-brief__bullet::before {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  border-top: 0.25rem solid transparent;
+  border-bottom: 0.25rem solid transparent;
+  border-left: 0.375rem solid #9b2c2c;
+}
+
+.cm-brief__point-text {
+  min-width: 0;
+}
+
+/* Blinking caret, shown only while text is still being revealed. */
+.cm-brief__caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 0.125rem;
+  background: #9b2c2c;
+  vertical-align: text-bottom;
+  animation: cm-blink 1s step-end infinite;
+}
+
+@keyframes cm-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Respect users who have asked for less motion: no caret, no blink. */
+@media (prefers-reduced-motion: reduce) {
+  .cm-brief__caret {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* A finding sits under the case it belongs to: indented, no bullet of its own,
+   and a shade quieter so the case names stay the scanning anchors. */
+.cm-brief__point--sub {
+  padding-left: 1.1rem;
+  color: #514f4d;
+  font-size: 0.8125rem;
+}
+
+/* ── the cases, rendered from structured alerts ─────────────────────────────
+   Built from digest.alerts rather than from the narrative string, so the
+   account name can be a real link and the lower band can be revealed on
+   demand. Apex decides what is in which band; this only draws it. */
+.cm-cards {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cm-cards--muted {
+  opacity: 0.85;
+}
+.cm-card {
+  margin: 0;
+  padding: 0.4rem 0.1rem;
+  border-top: 1px solid #f0efee;
+}
+.cm-card__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.cm-card__name {
+  font-weight: 600;
+}
+.cm-card__account {
+  font-size: 0.75rem;
+  color: #0176d3;
+  text-decoration: none;
+}
+.cm-card__account:hover,
+.cm-card__account:focus-visible {
+  text-decoration: underline;
+}
+.cm-card__findings {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0 0 0 1.1rem;
+}
+.cm-card__finding {
+  font-size: 0.8125rem;
+  color: #514f4d;
+  line-height: 1.45;
+}
+.cm-card__finding::before {
+  content: "\21B3";
+  margin-right: 0.35rem;
+  color: #a8a5a2;
+}
+.cm-pill {
+  flex: none;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
+.cm-pill--red {
+  background: #fddde3;
+  color: #ba0517;
+}
+.cm-pill--amber {
+  background: #fcefd4;
+  color: #8c4b02;
+}
+.cm-pill--info,
+.cm-pill--clear {
+  background: #ecebea;
+  color: #514f4d;
+}
+
+/* The lower band is one click away, never silently dropped. */
+.cm-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.3rem 0.5rem;
+  background: transparent;
+  border: 1px solid #dddbda;
+  border-radius: 0.25rem;
+  color: #0176d3;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.cm-more:hover {
+  background: #f3f3f3;
+}
+.cm-more:focus-visible {
+  outline: 2px solid #0176d3;
+  outline-offset: 1px;
+}
+.cm-more__icon {
+  --sds-c-icon-color-foreground-default: #0176d3;
+}
+.cm-card__name--link {
+  color: #0176d3;
+  text-decoration: none;
+}
+.cm-card__name--link:hover,
+.cm-card__name--link:focus-visible {
+  text-decoration: underline;
+}

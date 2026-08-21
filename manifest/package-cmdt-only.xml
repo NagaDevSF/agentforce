@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Custom Metadata ONLY. Brief_Priority__mdt is the trigger-rule configuration for
+  the Case Manager AI digest: the type, its 6 fields, and the 16 rule records.
+
+  Nothing in production consumes this yet - no CaseManagerAI Apex is deployed
+  there. It lands as inert configuration, ready for the classes to follow.
+
+  A Custom Metadata Type is configuration rather than data and consumes no data
+  storage, which is why it was kept when Morning_Brief__c was removed.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Brief_Priority__mdt</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>Brief_Priority.Account_UCC</members>
+        <members>Brief_Priority.Cancel_Notice</members>
+        <members>Brief_Priority.Cancellation_Dated</members>
+        <members>Brief_Priority.Customer_Email</members>
+        <members>Brief_Priority.Field_Updated</members>
+        <members>Brief_Priority.In_Collections</members>
+        <members>Brief_Priority.In_Legal</members>
+        <members>Brief_Priority.Multiple_Plans</members>
+        <members>Brief_Priority.NSF_Count_High</members>
+        <members>Brief_Priority.NSF_Second</members>
+        <members>Brief_Priority.Open_Case_Aging</members>
+        <members>Brief_Priority.Open_Case_Urgent</members>
+        <members>Brief_Priority.Open_Task</members>
+        <members>Brief_Priority.PSI_NSF</members>
+        <members>Brief_Priority.Quick_Note</members>
+        <members>Brief_Priority.UCC_High</members>
+        <members>Brief_Priority.UCC_Medium</members>
+        <name>CustomMetadata</name>
+    </types>
+    <version>67.0</version>
+</Package>

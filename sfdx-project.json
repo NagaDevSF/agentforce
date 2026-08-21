@@ -1,0 +1,7 @@
+{
+  "packageDirectories": [{ "path": "force-app", "default": true }],
+  "name": "casemanagerai-nagadsb",
+  "namespace": "",
+  "sfdcLoginUrl": "https://test.salesforce.com",
+  "sourceApiVersion": "67.0"
+}

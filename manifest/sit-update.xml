@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Components whose references to Morning_Brief__c were removed. These must
+     land BEFORE the object is deleted, which is why the deletions are supplied
+     as post-destructive changes. -->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>CaseManagerAIController</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>caseManagerAI</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <version>67.0</version>
+</Package>

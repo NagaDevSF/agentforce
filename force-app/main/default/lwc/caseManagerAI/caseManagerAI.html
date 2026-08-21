@@ -1,0 +1,215 @@
+<template>
+  <lightning-card icon-name="utility:einstein">
+    <h1 slot="title" class="cm-title">
+      <span>{cardTitle}</span>
+      <lightning-badge label={scopeLabel} class="cm-scope"></lightning-badge>
+    </h1>
+
+    <div slot="actions" class="cm-actions">
+      <template if:true={showGenerate}>
+        <lightning-button
+          label={generateLabel}
+          icon-name="utility:einstein"
+          variant="brand"
+          title="Read your whole book and build the triage now"
+          onclick={handleGenerate}
+        ></lightning-button>
+      </template>
+      <lightning-button-icon
+        icon-name="utility:refresh"
+        alternative-text="Refresh"
+        title="Refresh"
+        onclick={handleRefresh}
+      ></lightning-button-icon>
+    </div>
+
+    <div class="slds-var-p-horizontal_medium">
+      <!-- ───────────── error ───────────── -->
+      <template if:true={errorMessage}>
+        <div class="slds-var-m-bottom_small">
+          <lightning-icon
+            icon-name="utility:warning"
+            size="x-small"
+            variant="warning"
+            class="slds-var-m-right_x-small"
+          ></lightning-icon>
+          <span class="cm-error">{errorMessage}</span>
+        </div>
+      </template>
+
+      <!-- ───────────── resting state, before Generate ───────────── -->
+      <template if:true={showPrompt}>
+        <div class="cm-quiet" role="status">
+          <lightning-icon
+            icon-name="utility:einstein"
+            size="small"
+            alternative-text="Case Manager AI"
+            class="slds-var-m-right_x-small"
+          ></lightning-icon>
+          <span
+            >Press Generate to read your book and build this morning's
+            triage.</span
+          >
+        </div>
+      </template>
+
+      <template if:true={isLoadingDigest}>
+        <div class="cm-loading">
+          <lightning-spinner
+            alternative-text="Building your triage"
+            size="small"
+          ></lightning-spinner>
+          <span class="slds-var-m-left_small">Reading your book…</span>
+        </div>
+      </template>
+
+      <!-- ───────────── morning brief card ───────────── -->
+      <template if:true={showDigest}>
+        <article class="cm-brief" role="status">
+          <div class="cm-brief__main">
+            <div class="cm-brief__header">
+              <span class="cm-brief__badge">
+                <lightning-icon
+                  icon-name="utility:warning"
+                  size="xx-small"
+                  class="cm-brief__badge-icon"
+                ></lightning-icon>
+                <span class="cm-brief__badge-text">{digestLabel}</span>
+              </span>
+              <span class="cm-brief__title"
+                >AI SUMMARY · YOUR BOOK THIS MORNING</span
+              >
+              <span class="cm-brief__provenance">{digestProvenance}</span>
+            </div>
+
+            <!-- While the AI summary types itself out: plain lines, no links.
+                 The moment it finishes, the structured cards below take over and
+                 the account names become clickable. -->
+            <ul class="cm-brief__points" if:false={showCaseCards}>
+              <template for:each={narrativePoints} for:item="pt">
+                <li key={pt.key} class={pt.itemClass}>
+                  <template if:false={pt.isSub}>
+                    <span class="cm-brief__bullet" aria-hidden="true"></span>
+                  </template>
+                  <lightning-formatted-rich-text
+                    class="cm-brief__point-text"
+                    value={pt.text}
+                  ></lightning-formatted-rich-text>
+                  <template if:true={pt.isLast}>
+                    <template if:true={isTyping}>
+                      <span class="cm-brief__caret" aria-hidden="true"></span>
+                    </template>
+                  </template>
+                </li>
+              </template>
+            </ul>
+            <template if:true={isTyping}>
+              <span class="slds-assistive-text"
+                >AI is writing your morning brief</span
+              >
+            </template>
+
+            <!-- The same content the summary just typed, now interactive.
+                 It MUST live inside cm-brief__main: rendering it after the
+                 card made the text jump out of the card and reappear below
+                 it the instant typing finished. -->
+            <template if:true={showCaseCards}>
+              <ul class="cm-cards">
+                <template for:each={topCases} for:item="c">
+                  <li key={c.id} class="cm-card">
+                    <div class="cm-card__head">
+                      <span class={c.pillClass}>{c.severity}</span>
+                      <template if:true={c.isLinked}>
+                        <a href={c.accountUrl} class="cm-card__name cm-card__name--link"
+                           title="Open the client account">{c.name}</a>
+                      </template>
+                      <template if:true={c.notLinked}>
+                        <span class="cm-card__name">{c.name}</span>
+                      </template>
+                      <template if:true={c.showAccountName}>
+                        <span class="cm-card__account">{c.accountName}</span>
+                      </template>
+                    </div>
+                    <ul class="cm-card__findings">
+                      <template for:each={c.findings} for:item="f">
+                        <li key={f.key} class="cm-card__finding">{f.text}</li>
+                      </template>
+                    </ul>
+                  </li>
+                </template>
+              </ul>
+
+              <template if:true={hasLowerBand}>
+                <button class="cm-more" type="button" onclick={handleToggleLowerBand}>
+                  <lightning-icon
+                    icon-name={lowerToggleIcon}
+                    size="xx-small"
+                    class="cm-more__icon"
+                  ></lightning-icon>
+                  <span>{lowerToggleLabel}</span>
+                </button>
+
+                <template if:true={showLowerBand}>
+                  <ul class="cm-cards cm-cards--muted">
+                    <template for:each={lowerCases} for:item="c">
+                      <li key={c.id} class="cm-card">
+                        <div class="cm-card__head">
+                          <span class={c.pillClass}>{c.severity}</span>
+                          <template if:true={c.isLinked}>
+                            <a href={c.accountUrl} class="cm-card__name cm-card__name--link"
+                               title="Open the client account">{c.name}</a>
+                          </template>
+                          <template if:true={c.notLinked}>
+                            <span class="cm-card__name">{c.name}</span>
+                          </template>
+                          <template if:true={c.showAccountName}>
+                            <span class="cm-card__account">{c.accountName}</span>
+                          </template>
+                        </div>
+                        <ul class="cm-card__findings">
+                          <template for:each={c.findings} for:item="f">
+                            <li key={f.key} class="cm-card__finding">{f.text}</li>
+                          </template>
+                        </ul>
+                      </li>
+                    </template>
+                  </ul>
+                </template>
+              </template>
+            </template>
+          </div>
+
+          <template if:true={hasDoFirst}>
+            <aside class="cm-brief__side">
+              <h3 class="cm-brief__side-title">DO FIRST</h3>
+              <ul class="cm-brief__actions">
+                <template for:each={doFirstItems} for:item="action">
+                  <li key={action} class="cm-brief__action">
+                    <span class="cm-brief__arrow" aria-hidden="true"
+                      >&#9656;</span
+                    >
+                    <span>{action}</span>
+                  </li>
+                </template>
+              </ul>
+            </aside>
+          </template>
+        </article>
+      </template>
+
+      <!-- ───────────── quiet state (nothing flagged) ───────────── -->
+      <template if:true={showQuietState}>
+        <div class="cm-quiet">
+          <lightning-icon
+            icon-name="utility:success"
+            size="x-small"
+            variant="success"
+            class="slds-var-m-right_x-small"
+          ></lightning-icon>
+          <span>{quietStateLabel}</span>
+        </div>
+      </template>
+
+    </div>
+  </lightning-card>
+</template>

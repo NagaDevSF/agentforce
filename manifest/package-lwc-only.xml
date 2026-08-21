@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The caseManagerAI Lightning Web Component only.
+
+  Everything else in this feature is already live in production and verified
+  current (2026-08-18): the four production Apex classes, both test classes,
+  Case_Manager_AI_Access, and Brief_Priority__mdt with its 6 fields and 16 rule
+  records. This bundle is the last piece that differs.
+
+  What changes: the morning digest no longer builds on page load. It waits for
+  the Generate button. No Apex and no metadata are touched, so no tests run.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>caseManagerAI</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <version>67.0</version>
+</Package>

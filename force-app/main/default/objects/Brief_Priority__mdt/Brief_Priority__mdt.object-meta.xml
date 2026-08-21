@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Priority and severity for each morning-brief trigger. Admin-editable so priorities can be reordered, added or switched off without a deployment. Custom Metadata rather than a Custom Setting: this configuration must promote between orgs, and Custom Setting data does not deploy.</description>
+    <label>Brief Priority</label>
+    <pluralLabel>Brief Priorities</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>
