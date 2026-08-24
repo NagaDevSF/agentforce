@@ -3,6 +3,8 @@ import { ShowToastEvent } from "lightning/platformShowToastEvent";
 
 import canViewAllCases from "@salesforce/apex/CaseManagerAIController.canViewAllCases";
 import getMorningDigest from "@salesforce/apex/CaseManagerAIController.getMorningDigest";
+import getAccountOpportunities from "@salesforce/apex/CsCaseManagerDashboardController.getAccountOpportunities";
+import CaseWorkModal from "c/caseWorkModal";
 
 import USER_ID from "@salesforce/user/Id";
 
@@ -305,16 +307,50 @@ export default class CaseManagerAI extends LightningElement {
    * The account link is built here rather than in Apex because it is
    * presentation. A relative URL keeps it correct in every org.
    */
+  async handleAccountClick(event) {
+    const accountId = event.currentTarget.dataset.accountId;
+    if (!accountId) return;
+    const opportunityIds = await this._buildOpportunityIds(accountId, null);
+    CaseWorkModal.open({
+      size:                  'full',
+      accountId,
+      opportunityIds,
+      selectedOpportunityId: null,
+      caseIds:               []
+    });
+  }
+
+  async handleCaseClick(event) {
+    const accountId     = event.currentTarget.dataset.accountId;
+    const opportunityId = event.currentTarget.dataset.opportunityId;
+    if (!accountId) return;
+    const opportunityIds = await this._buildOpportunityIds(accountId, opportunityId);
+    CaseWorkModal.open({
+      size:                  'full',
+      accountId,
+      opportunityIds,
+      selectedOpportunityId: opportunityId || null,
+      caseIds:               []
+    });
+  }
+
+  async _buildOpportunityIds(accountId, specificOppId) {
+    try {
+      const allIds = (await getAccountOpportunities({ accountId })) || [];
+      if (!specificOppId) return allIds;
+      const rest = allIds.filter(id => id !== specificOppId);
+      return [specificOppId, ...rest];
+    } catch (e) {
+      return specificOppId ? [specificOppId] : [];
+    }
+  }
+
   decorate(alerts) {
     return alerts.map((a) => ({
       id: a.opportunityId,
       name: a.opportunityName,
       accountName: a.accountName,
-      accountUrl: a.accountId ? `/lightning/r/Account/${a.accountId}/view` : null,
-      // The CASE NAME is the click target, always, whenever there is an account
-      // to go to. Hanging the link off the account name instead meant a case
-      // whose account is named the same as the case had nothing clickable at
-      // all - which is most of them in some books.
+      accountId: a.accountId,
       isLinked: !!a.accountId,
       notLinked: !a.accountId,
       // Only worth printing separately when it actually says something new.

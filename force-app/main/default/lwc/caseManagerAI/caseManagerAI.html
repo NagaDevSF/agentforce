@@ -120,14 +120,22 @@
                     <div class="cm-card__head">
                       <span class={c.pillClass}>{c.severity}</span>
                       <template if:true={c.isLinked}>
-                        <a href={c.accountUrl} class="cm-card__name cm-card__name--link"
-                           title="Open the client account">{c.name}</a>
+                        <button type="button"
+                                class="cm-card__name cm-card__name--link"
+                                data-account-id={c.accountId}
+                                data-opportunity-id={c.id}
+                                onclick={handleCaseClick}
+                                title="Open in CS Workspace">{c.name}</button>
                       </template>
                       <template if:true={c.notLinked}>
                         <span class="cm-card__name">{c.name}</span>
                       </template>
                       <template if:true={c.showAccountName}>
-                        <span class="cm-card__account">{c.accountName}</span>
+                        <button type="button"
+                                class="cm-card__account"
+                                data-account-id={c.accountId}
+                                onclick={handleAccountClick}
+                                title="Open account in CS Workspace">{c.accountName}</button>
                       </template>
                     </div>
                     <ul class="cm-card__findings">
@@ -156,8 +164,12 @@
                         <div class="cm-card__head">
                           <span class={c.pillClass}>{c.severity}</span>
                           <template if:true={c.isLinked}>
-                            <a href={c.accountUrl} class="cm-card__name cm-card__name--link"
-                               title="Open the client account">{c.name}</a>
+                            <button type="button"
+                                    class="cm-card__name cm-card__name--link"
+                                    data-account-id={c.accountId}
+                                    data-opportunity-id={c.id}
+                                    onclick={handleCaseClick}
+                                    title="Open in CS Workspace">{c.name}</button>
                           </template>
                           <template if:true={c.notLinked}>
                             <span class="cm-card__name">{c.name}</span>
