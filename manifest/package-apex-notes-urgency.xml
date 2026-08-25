@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Case Manager AI - notes/urgency change, 2026-08-25.
+  Two classes plus their tests. No CMDT, no LWC, no permission set.
+
+  Deploy with ALL FOUR test classes named, even though only two are in this
+  package: RunSpecifiedTests measures coverage only from the classes you name,
+  so omitting one fails the deploy on coverage while every test passes.
+
+  sf project deploy start -o prod --manifest manifest/package-apex-notes-urgency.xml \
+    --test-level RunSpecifiedTests \
+    --tests CaseManagerAIServiceTest --tests CaseManagerAIDigestServiceTest \
+    --tests CaseManagerAIBookActionTest --tests CaseManagerAIActivitySummaryTest \
+    --dry-run
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>CaseManagerAIActivitySummary</members>
+        <members>CaseManagerAIActivitySummaryTest</members>
+        <members>CaseManagerAIDigestService</members>
+        <members>CaseManagerAIDigestServiceTest</members>
+        <name>ApexClass</name>
+    </types>
+    <version>67.0</version>
+</Package>

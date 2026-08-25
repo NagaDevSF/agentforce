@@ -881,6 +881,119 @@ private class CaseManagerAIDigestServiceTest {
   }
 
   /**
+   * THE POINT OF THE WHOLE CHANGE. A case whose only trigger is a note still
+   * gets read, even when a Red case is sitting above it in the book.
+   *
+   * Under the old selection the summariser was handed topBandAlerts(), so one
+   * Red anywhere meant every Info case was skipped — and a note reading "the
+   * client is cancelling on Friday" reached nobody, because no field on the
+   * Opportunity says that. Candidates are now the cases carrying human-written
+   * text first, regardless of band.
+   */
+  @IsTest
+  static void aNoteOnlyCaseIsReadEvenWhenARedExists() {
+    pinPriorities();
+
+    Account a = makeAccount('Mixed Book Client', 'Signed');
+
+    Opportunity red = makeOpp(a, 'Red Case');
+    red.UCC_Risk__c = 'High';
+    insert red;
+
+    Opportunity noteOnly = makeOpp(a, 'Note Only Case');
+    insert noteOnly;
+
+    ContentNote cn = new ContentNote(
+      Title = 'URGENT',
+      Content = Blob.valueOf('Client says they will cancel on Friday.')
+    );
+    insert cn;
+    insert new ContentDocumentLink(
+      ContentDocumentId = cn.Id,
+      LinkedEntityId = noteOnly.Id,
+      ShareType = 'V',
+      Visibility = 'AllUsers'
+    );
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+    CaseManagerAIActivitySummary.mockSummaries = new Map<Id, String>{
+      noteOnly.Id => 'URGENCY: Red\nSUMMARY: Client says they will cancel on Friday.'
+    };
+    CaseManagerAIActivitySummary.mockSourceText = new Map<Id, String>{
+      noteOnly.Id => 'Note: URGENT. Client says they will cancel on Friday.'
+    };
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    CaseManagerAIDigestService.CaseAlert found = null;
+    for (CaseManagerAIDigestService.CaseAlert x : d.alerts) {
+      if (x.opportunityId == noteOnly.Id) {
+        found = x;
+      }
+    }
+    System.assertNotEquals(null, found, 'The note-only case must still be listed.');
+    System.assert(
+      found.triggers[0].contains('cancel'),
+      'The summary belongs at the top of the findings, got: ' + found.triggers
+    );
+  }
+
+  /**
+   * The model proposes; this class disposes. An urgency of Red is honoured only
+   * as far as MODEL_MAX_SEVERITY, which ships at Amber.
+   *
+   * Red is the banner a case manager reads as established fact about a client
+   * file. Letting a model reach it is a policy decision, so it is a constant to
+   * be changed on purpose rather than a side effect of prompt wording.
+   */
+  @IsTest
+  static void modelUrgencyIsCappedAtAmber() {
+    pinPriorities();
+
+    Account a = makeAccount('Capped Client', 'Signed');
+    Opportunity o = makeOpp(a, 'Capped Case');
+    insert o;
+
+    ContentNote cn = new ContentNote(
+      Title = 'Escalation',
+      Content = Blob.valueOf('Client is threatening to dispute every draft.')
+    );
+    insert cn;
+    insert new ContentDocumentLink(
+      ContentDocumentId = cn.Id,
+      LinkedEntityId = o.Id,
+      ShareType = 'V',
+      Visibility = 'AllUsers'
+    );
+
+    CaseManagerAIActivitySummary.mockSummaries = new Map<Id, String>{
+      o.Id => 'URGENCY: Red\nSUMMARY: Client is threatening to dispute every draft.'
+    };
+    CaseManagerAIActivitySummary.mockSourceText = new Map<Id, String>{
+      o.Id => 'Note: client is threatening to dispute every draft.'
+    };
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    System.assertEquals(1, d.alerts.size(), 'One flagged case expected.');
+    System.assertEquals(
+      CaseManagerAIDigestService.SEV_AMBER,
+      d.alerts[0].severity,
+      'The model asked for Red and must be held at Amber. Got: ' +
+        d.alerts[0].severity
+    );
+    System.assertEquals(
+      0,
+      d.redCount,
+      'A model-proposed urgency must never produce a Red count.'
+    );
+  }
+
+  /**
    * The narrative names the top cases, indents their findings, and counts the
    * rest.
    *

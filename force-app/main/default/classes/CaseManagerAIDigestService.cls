@@ -79,6 +79,16 @@ public with sharing class CaseManagerAIDigestService {
     SEV_CLEAR => 0
   };
 
+  /**
+   * The highest band CaseManagerAIActivitySummary is allowed to reach.
+   *
+   * See cappedModelSeverity(). Amber by default: high enough that what a client
+   * wrote can pull a case up out of the Info floor, low enough that the Red
+   * banner still means a field value proved something.
+   */
+  @TestVisible
+  private static String MODEL_MAX_SEVERITY = SEV_AMBER;
+
   // Trigger keys. Each must have a matching Brief_Priority__mdt row, or the
   // rule is skipped — configuration decides what fires, not this class.
   @TestVisible
@@ -281,6 +291,14 @@ public with sharing class CaseManagerAIDigestService {
     @AuraEnabled
     public List<FieldChangeInfo> changes;
 
+    /**
+     * True when a human wrote something on this case inside the window — an
+     * email, an open task, a note. These are the cases the summariser has
+     * anything to read, so they get first claim on the bounded model calls.
+     */
+    @AuraEnabled
+    public Boolean hasWrittenActivity;
+
     public CaseAlert() {
       this.triggers = new List<String>();
       this.activePlans = new List<String>();
@@ -288,6 +306,7 @@ public with sharing class CaseManagerAIDigestService {
       this.severity = SEV_CLEAR;
       this.rank = 0;
       this.priorityOrder = NO_PRIORITY;
+      this.hasWrittenActivity = false;
     }
 
     /**
@@ -402,6 +421,16 @@ public with sharing class CaseManagerAIDigestService {
 
     sortByUrgency(digest.alerts);
 
+    // BEFORE banding, not after. The summariser can raise a case's severity on
+    // the strength of what someone wrote on it, so the bands have to be decided
+    // once that is known — otherwise a case the model just called Red would be
+    // filtered out as a lower band by a decision taken before it was read.
+    enrichWithActivitySummary(digest);
+    for (CaseAlert a : digest.alerts) {
+      a.rank = rankOf(a);
+    }
+    sortByUrgency(digest.alerts);
+
     for (CaseAlert a : digest.alerts) {
       if (a.severity == SEV_RED) {
         digest.redCount++;
@@ -422,8 +451,6 @@ public with sharing class CaseManagerAIDigestService {
       }
     }
 
-    enrichWithActivitySummary(digest);
-
     digest.groundingText = buildGroundingText(digest);
     digest.activityCount = countActivity(book);
     digest.narrative = buildNarrative(digest);
@@ -432,12 +459,18 @@ public with sharing class CaseManagerAIDigestService {
   }
 
   /**
-   * Adds one plain-language line per shown case saying what the humans wrote.
+   * Adds one plain-language line per read case, and lets it raise the case.
    *
-   * Bounded to the cases the card actually displays, because each one costs a
-   * model call. It is prepended rather than appended: what a client is asking
-   * for is the thing a case manager wants first, and the field-derived findings
-   * read as supporting detail underneath it.
+   * WHICH CASES GET READ. Not the top band any more. A case whose only dated
+   * trigger is a note starts at Info, and under the old selection a single Red
+   * anywhere in the book meant it was never read at all — so the note that
+   * said the client is cancelling on Friday could never surface. Candidates are
+   * now the cases carrying human-written activity, best rank first, and only
+   * then everything else. Still bounded to NARRATIVE_MAX_CASES model calls.
+   *
+   * The line is prepended rather than appended: what a client is asking for is
+   * the thing a case manager wants first, and the field-derived findings read
+   * as supporting detail underneath it.
    *
    * Failure here is silent by design. If the model is off, throttled or refuses,
    * the case keeps exactly the deterministic findings it already had.
@@ -446,33 +479,76 @@ public with sharing class CaseManagerAIDigestService {
     if (digest.alerts.isEmpty()) {
       return;
     }
-    List<CaseAlert> shown = topBandAlerts(digest.alerts);
-    if (shown.isEmpty()) {
-      return;
+
+    List<CaseAlert> candidates = new List<CaseAlert>();
+    for (CaseAlert a : digest.alerts) {
+      if (a.hasWrittenActivity == true) {
+        candidates.add(a);
+      }
+    }
+    for (CaseAlert a : digest.alerts) {
+      if (a.hasWrittenActivity != true) {
+        candidates.add(a);
+      }
     }
 
     Set<Id> ids = new Set<Id>();
     Map<Id, List<String>> findings = new Map<Id, List<String>>();
     Map<Id, CaseAlert> byId = new Map<Id, CaseAlert>();
-    for (Integer i = 0; i < Math.min(shown.size(), NARRATIVE_MAX_CASES); i++) {
-      CaseAlert a = shown[i];
+    for (
+      Integer i = 0;
+      i < Math.min(candidates.size(), NARRATIVE_MAX_CASES);
+      i++
+    ) {
+      CaseAlert a = candidates[i];
       ids.add(a.opportunityId);
       findings.put(a.opportunityId, a.triggers);
       byId.put(a.opportunityId, a);
     }
+    if (ids.isEmpty()) {
+      return;
+    }
 
-    Map<Id, String> summaries = CaseManagerAIActivitySummary.forCases(
+    Map<Id, CaseManagerAIActivitySummary.Verdict> verdicts = CaseManagerAIActivitySummary.forCases(
       ids,
       thresholdFor(T_CUSTOMER_EMAIL, DEFAULT_RECENCY_DAYS),
       findings
     );
 
-    for (Id oppId : summaries.keySet()) {
+    for (Id oppId : verdicts.keySet()) {
       CaseAlert a = byId.get(oppId);
-      if (a != null) {
-        a.triggers.add(0, summaries.get(oppId));
+      if (a == null) {
+        continue;
       }
+      CaseManagerAIActivitySummary.Verdict v = verdicts.get(oppId);
+      if (String.isNotBlank(v.summary)) {
+        a.triggers.add(0, v.summary);
+      }
+      // escalate() only ever moves up, so a model that reads a Red case as
+      // quiet cannot talk the brief down out of a finding a field value proved.
+      a.severity = escalate(a.severity, cappedModelSeverity(v.urgency));
     }
+  }
+
+  /**
+   * How urgent the model is permitted to make a case.
+   *
+   * The model may raise a case as far as MODEL_MAX_SEVERITY and no further.
+   * At Amber — the shipped default — a note saying the client is cancelling on
+   * Friday lifts the case above the Info floor and into the top band whenever
+   * no Red is present, which is the behaviour that was asked for, while Red
+   * stays something only a field value can assert. Red is the compliance-
+   * sensitive banner at a debt settlement company: it is the one a case manager
+   * reads as "this is established fact about this file".
+   *
+   * Set MODEL_MAX_SEVERITY to SEV_RED to let the model reach the top banner.
+   * That is a deliberate policy change, not a tuning knob — make it on purpose.
+   */
+  private static String cappedModelSeverity(String urgency) {
+    String asked = normaliseSeverity(urgency);
+    return SEVERITY_RANK.get(asked) > SEVERITY_RANK.get(MODEL_MAX_SEVERITY)
+      ? MODEL_MAX_SEVERITY
+      : asked;
   }
 
   // ───────────────────────────── Loaders ─────────────────────────────
@@ -1232,6 +1308,14 @@ public with sharing class CaseManagerAIDigestService {
 
     // ── Priority 3: customer contact needing follow up ─────────────────────
     if (signals != null) {
+      // Marked whether or not the rules below are switched on: this says only
+      // that there is human-written text to read on this case, which is what
+      // decides who gets a model call. An admin deactivating a rule should not
+      // also blind the summariser.
+      alert.hasWrittenActivity =
+        signals.inboundEmails > 0 ||
+        signals.openTasks > 0 ||
+        signals.noteCount > 0;
       if (signals.inboundEmails > 0) {
         datedTriggerFired = alert.flag(
           T_CUSTOMER_EMAIL,
