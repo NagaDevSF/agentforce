@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Case Manager AI — 2026-08-27 release.
+
+  DO FIRST loop fix + book scoped to IsClosed = true + Load more + AI shimmer.
+
+  Contents verified against production on 2026-08-27 by reading live
+  ApexClass.Body and LightningComponentResource.Source: these four are the only
+  components that differ. CaseManagerAIService, CaseManagerAIController,
+  CaseManagerAIAgentAction, CaseManagerAIBookAction, CaseManagerAIActivitySummary,
+  CaseManagerAIServiceTest and CaseManagerAIActivitySummaryTest are all byte
+  identical to prod and are deliberately NOT listed.
+
+  CaseManagerAIBookActionTest is here only because its fixture stage changed —
+  'Signed' is not a configured stage in any of these orgs, and loadBook() now
+  filters on IsClosed, so the old fixture produces an empty book.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>CaseManagerAIDigestService</members>
+        <members>CaseManagerAIDigestServiceTest</members>
+        <members>CaseManagerAIBookActionTest</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>caseManagerAI</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <version>67.0</version>
+</Package>

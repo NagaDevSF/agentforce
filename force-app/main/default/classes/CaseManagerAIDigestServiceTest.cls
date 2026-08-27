@@ -23,11 +23,57 @@ private class CaseManagerAIDigestServiceTest {
     Opportunity o = new Opportunity(
       Name = name,
       AccountId = a.Id,
-      StageName = 'Signed',
+      // Must be a CLOSED stage: loadBook() filters on IsClosed since
+      // 2026-08-27, and 'Signed' is not a closed stage in any org here,
+      // so a fixture using it produces an empty book and every
+      // assertion below it fails for the wrong reason.
+      StageName = 'Enrolled',
       CloseDate = Date.today().addDays(30),
       Case_Manager__c = UserInfo.getUserId()
     );
     return o;
+  }
+
+  /**
+   * Re-stamps Account.Stage__c AFTER the Opportunity is inserted.
+   *
+   * Org automation syncs the Account stage off the Opportunity stage: probed in
+   * SIT on 2026-08-27, inserting an Opportunity at 'Enrolled' or 'Contract
+   * Signed' against an Account staged 'UCC' rewrites that Account to 'Signed',
+   * while 'NSF' and 'Fees Done' leave it alone. Setting the value on the
+   * Account before the Opportunity exists therefore tests the org's triggers
+   * rather than this class, and does it differently in every org.
+   *
+   * The old fixtures dodged this only because 'Signed' was an inert value that
+   * matched no stage configuration and fired nothing.
+   */
+  private static void stampAccountStage(Id accountId, String stage) {
+    update new Account(Id = accountId, Stage__c = stage);
+  }
+
+  /**
+   * Any active Cancellation_Reason__c value, resolved by describe.
+   *
+   * Production carries a validation rule - "Cancellation Reason is required
+   * when Stage is Cancelled" - that SIT does not, so a fixture setting the
+   * stage without the reason passes every sandbox and fails the production
+   * deploy. Found exactly that way on 2026-08-27.
+   *
+   * Read by describe rather than hard-coded because the picklist differs
+   * between orgs: production offers Graduated and Passed Away, SIT offers
+   * File Completed, and only some values appear in both. Naming one couples
+   * this test to whichever org happened to be checked.
+   */
+  private static String anyCancellationReason() {
+    for (
+      Schema.PicklistEntry e :
+        Opportunity.Cancellation_Reason__c.getDescribe().getPicklistValues()
+    ) {
+      if (e.isActive()) {
+        return e.getValue();
+      }
+    }
+    return null;
   }
 
   @IsTest
@@ -91,6 +137,8 @@ private class CaseManagerAIDigestServiceTest {
     Account a = makeAccount('Staged Client', 'UCC');
     Opportunity o = makeOpp(a, 'Staged Case');
     insert o;
+    // Must come after the insert - see stampAccountStage().
+    stampAccountStage(a.Id, 'UCC');
 
     CaseManagerAIDigestService.recencyOverride = Date.today();
 
@@ -1095,6 +1143,213 @@ private class CaseManagerAIDigestServiceTest {
     System.assert(
       d.narrative.contains('Only Case'),
       'The single case must still be named: ' + d.narrative
+    );
+  }
+
+  /**
+   * Regression: DO FIRST used to name the same case three times.
+   *
+   * The cap was checked while walking one case's triggers, so the worst case in
+   * the book filled every slot and the loop never reached the second case. Each
+   * of these three carries UCC risk, In legal and a cancellation date - exactly
+   * the shape that reproduced it - so the old loop returns three actions about
+   * Alpha Case and nothing about the other two.
+   */
+  @IsTest
+  static void doFirstNamesADifferentCaseInEveryAction() {
+    pinPriorities();
+    Account a = makeAccount('Do First Client', 'Signed');
+    List<Opportunity> opps = new List<Opportunity>();
+    for (String name : new List<String>{ 'Alpha Case', 'Bravo Case', 'Charlie Case' }) {
+      Opportunity o = makeOpp(a, name);
+      o.UCC_Risk__c = 'High';
+      o.Legal__c = UserInfo.getUserId();
+      o.Cancellation_Date__c = Date.today();
+      opps.add(o);
+    }
+    insert opps;
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    System.assertEquals(
+      3,
+      d.doFirst.size(),
+      'Three actionable cases must produce three actions: ' + d.doFirst
+    );
+    Set<String> named = new Set<String>();
+    for (String action : d.doFirst) {
+      for (Opportunity o : opps) {
+        if (action.contains(o.Name)) {
+          named.add(o.Name);
+        }
+      }
+    }
+    System.assertEquals(
+      3,
+      named.size(),
+      'Each action must be about a different case. Got: ' + d.doFirst
+    );
+  }
+
+  /**
+   * The other half of the rule: breadth first, depth only to fill the gap.
+   *
+   * One actionable case must still fill the card from its own findings, which
+   * is the one thing the old loop got right and a strict one-per-case fix
+   * would have broken.
+   */
+  @IsTest
+  static void doFirstFallsBackToOneCaseWhenTheBookIsSmall() {
+    pinPriorities();
+    Account a = makeAccount('Lone Client', 'Signed');
+    Opportunity o = makeOpp(a, 'Lone Case');
+    o.UCC_Risk__c = 'High';
+    o.Legal__c = UserInfo.getUserId();
+    o.Cancellation_Date__c = Date.today();
+    insert o;
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    System.assertEquals(
+      3,
+      d.doFirst.size(),
+      'A single case carrying three findings must still fill the card: ' +
+        d.doFirst
+    );
+    System.assertEquals(
+      3,
+      new Set<String>(d.doFirst).size(),
+      'The three actions must be distinct: ' + d.doFirst
+    );
+  }
+
+  /**
+   * Two findings can render the same sentence. UCC risk High and Account stage
+   * is UCC both read as "Chase the <case> UCC response", and the old loop spent
+   * two of its three slots saying it twice.
+   */
+  @IsTest
+  static void doFirstDoesNotRepeatOneAction() {
+    pinPriorities();
+    CaseManagerAIDigestService.priorityCache.put(
+      'ACCOUNT_UCC',
+      rule('ACCOUNT_UCC', 1, 'Red', null)
+    );
+    Account a = makeAccount('Twice Client', 'UCC');
+    Opportunity o = makeOpp(a, 'Twice Case');
+    o.UCC_Risk__c = 'High';
+    o.Cancellation_Date__c = Date.today();
+    insert o;
+    // Without this the account stage is overwritten by org automation,
+    // ACCOUNT_UCC never fires, and this test passes without exercising the
+    // duplicate it exists to catch. See stampAccountStage().
+    stampAccountStage(a.Id, 'UCC');
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    System.assertEquals(
+      new Set<String>(d.doFirst).size(),
+      d.doFirst.size(),
+      'No action may appear twice: ' + d.doFirst
+    );
+    Integer chases = 0;
+    for (String action : d.doFirst) {
+      if (action.startsWith('Chase the')) {
+        chases++;
+      }
+    }
+    System.assertEquals(
+      1,
+      chases,
+      'UCC risk and Account stage UCC must yield one chase, not two: ' +
+        d.doFirst
+    );
+  }
+
+  /**
+   * The book is closed opportunities only, decided 2026-08-27.
+   *
+   * A case manager services a case after it closes, so a deal still in flight
+   * with sales is not theirs to triage. Both cases here carry a High UCC risk
+   * and are identical apart from the stage, so the only thing that can explain
+   * one being absent is the filter.
+   *
+   * Note what this test does NOT assert: that cancelled cases are dropped.
+   * Cancelled is IsClosed = true, so it stays in the book by design - see the
+   * comment on the filter in loadBook().
+   */
+  @IsTest
+  static void openStagesAreNotInTheBook() {
+    pinPriorities();
+    Account a = makeAccount('Stage Client', 'Signed');
+
+    Opportunity closedOpp = makeOpp(a, 'Closed Case');
+    closedOpp.UCC_Risk__c = 'High';
+
+    Opportunity openOpp = makeOpp(a, 'Open Case');
+    openOpp.StageName = 'Build Plan';
+    openOpp.UCC_Risk__c = 'High';
+
+    insert new List<Opportunity>{ closedOpp, openOpp };
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    Set<String> named = new Set<String>();
+    for (CaseManagerAIDigestService.CaseAlert al : d.alerts) {
+      named.add(al.opportunityName);
+    }
+    System.assert(
+      named.contains('Closed Case'),
+      'A closed case must still be triaged. Got: ' + named
+    );
+    System.assert(
+      !named.contains('Open Case'),
+      'An in-flight sales stage must not reach the book. Got: ' + named
+    );
+  }
+
+  /** Cancelled is IsClosed = true, so it stays - this pins that deliberately. */
+  @IsTest
+  static void cancelledCasesStayInTheBook() {
+    pinPriorities();
+    Account a = makeAccount('Cancelled Client', 'Signed');
+    Opportunity o = makeOpp(a, 'Cancelled Case');
+    o.StageName = 'Cancelled';
+    o.Cancellation_Date__c = Date.today();
+    // Required by a production validation rule that SIT does not carry.
+    o.Cancellation_Reason__c = anyCancellationReason();
+    insert o;
+
+    CaseManagerAIDigestService.recencyOverride = Date.today();
+
+    Test.startTest();
+    CaseManagerAIDigestService.MorningDigest d = CaseManagerAIDigestService.buildMorningDigest();
+    Test.stopTest();
+
+    Set<String> named = new Set<String>();
+    for (CaseManagerAIDigestService.CaseAlert al : d.alerts) {
+      named.add(al.opportunityName);
+    }
+    System.assert(
+      named.contains('Cancelled Case'),
+      'Cancelled is IsClosed = true and stays in the book by decision. Got: ' +
+        named
     );
   }
 }

@@ -76,7 +76,7 @@
                 ></lightning-icon>
                 <span class="cm-brief__badge-text">{digestLabel}</span>
               </span>
-              <span class="cm-brief__title"
+              <span class={titleClass}
                 >AI SUMMARY · YOUR BOOK THIS MORNING</span
               >
               <span class="cm-brief__provenance">{digestProvenance}</span>
@@ -91,10 +91,20 @@
                   <template if:false={pt.isSub}>
                     <span class="cm-brief__bullet" aria-hidden="true"></span>
                   </template>
-                  <lightning-formatted-rich-text
-                    class="cm-brief__point-text"
-                    value={pt.text}
-                  ></lightning-formatted-rich-text>
+                  <!-- While typing, the text is already markup-stripped by
+                       plainNarrative, so a plain span renders it identically —
+                       and unlike lightning-formatted-rich-text it can carry the
+                       shimmer, whose gradient must clip to the glyphs and
+                       cannot reach inside that component's shadow root. -->
+                  <template if:true={isTyping}>
+                    <span class="cm-brief__point-text cm-shine">{pt.text}</span>
+                  </template>
+                  <template if:false={isTyping}>
+                    <lightning-formatted-rich-text
+                      class="cm-brief__point-text"
+                      value={pt.text}
+                    ></lightning-formatted-rich-text>
+                  </template>
                   <template if:true={pt.isLast}>
                     <template if:true={isTyping}>
                       <span class="cm-brief__caret" aria-hidden="true"></span>
@@ -147,6 +157,17 @@
                 </template>
               </ul>
 
+              <template if:true={hasMoreTop}>
+                <button class="cm-more" type="button" onclick={handleLoadMoreTop}>
+                  <lightning-icon
+                    icon-name="utility:chevrondown"
+                    size="xx-small"
+                    class="cm-more__icon"
+                  ></lightning-icon>
+                  <span>{topMoreLabel}</span>
+                </button>
+              </template>
+
               <template if:true={hasLowerBand}>
                 <button class="cm-more" type="button" onclick={handleToggleLowerBand}>
                   <lightning-icon
@@ -186,6 +207,17 @@
                       </li>
                     </template>
                   </ul>
+
+                  <template if:true={hasMoreLower}>
+                    <button class="cm-more" type="button" onclick={handleLoadMoreLower}>
+                      <lightning-icon
+                        icon-name="utility:chevrondown"
+                        size="xx-small"
+                        class="cm-more__icon"
+                      ></lightning-icon>
+                      <span>{lowerMoreLabel}</span>
+                    </button>
+                  </template>
                 </template>
               </template>
             </template>

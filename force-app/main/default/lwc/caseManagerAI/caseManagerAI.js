@@ -55,6 +55,19 @@ export default class CaseManagerAI extends LightningElement {
   /** True once the reader has asked to see the bands held back. */
   showLowerBand = false;
 
+  /**
+   * How many cases each list renders before a Load more button.
+   *
+   * A book is not a short list — the largest in production is 475 cases, and
+   * QA reported the tab stretching the page out of shape at 50-60. Rendering
+   * everything and letting the reader scroll is what causes that, so each list
+   * paginates and says how many are still behind the button. Nothing is
+   * dropped: the count in the label is the honest remainder.
+   */
+  PAGE_SIZE = 10;
+  topShown = 10;
+  lowerShown = 10;
+
   isLoadingDigest = false;
 
   /** True once Generate has been pressed at least once this page view. */
@@ -125,6 +138,11 @@ export default class CaseManagerAI extends LightningElement {
     this.hasGenerated = true;
     this.errorMessage = undefined;
     this.isLoadingDigest = true;
+    // A fresh triage starts at the top of both lists. Carrying the previous
+    // expansion over would silently render 200 cards on a regenerate.
+    this.topShown = this.PAGE_SIZE;
+    this.lowerShown = this.PAGE_SIZE;
+    this.showLowerBand = false;
     try {
       this.digest = await getMorningDigest();
       this.startTyping();
@@ -240,6 +258,13 @@ export default class CaseManagerAI extends LightningElement {
     return !this.typingDone;
   }
 
+  /** The heading shimmers with the body, so the whole card reads as writing. */
+  get titleClass() {
+    return this.isTyping
+      ? "cm-brief__title cm-shine cm-shine--title"
+      : "cm-brief__title";
+  }
+
   get scopeLabel() {
     return this.viewAll ? "All case managers" : "My cases";
   }
@@ -270,15 +295,72 @@ export default class CaseManagerAI extends LightningElement {
    * rather than a second implementation of the same rule.
    */
   get topCases() {
-    return this.decorate((this.digest?.alerts || []).filter((a) => a.inTopBand));
+    return this.decorate(this.topBand.slice(0, this.topShown));
   }
 
   get lowerCases() {
-    return this.decorate((this.digest?.alerts || []).filter((a) => !a.inTopBand));
+    return this.decorate(this.lowerBand.slice(0, this.lowerShown));
+  }
+
+  /** Unpaginated, so the counts below tell the truth about the whole book. */
+  get topBand() {
+    return (this.digest?.alerts || []).filter((a) => a.inTopBand);
+  }
+
+  get lowerBand() {
+    return (this.digest?.alerts || []).filter((a) => !a.inTopBand);
   }
 
   get lowerCount() {
-    return (this.digest?.alerts || []).filter((a) => !a.inTopBand).length;
+    return this.lowerBand.length;
+  }
+
+  // ───────────────────────── Load more ─────────────────────────
+
+  get topRemaining() {
+    return Math.max(0, this.topBand.length - this.topShown);
+  }
+
+  get hasMoreTop() {
+    return this.topRemaining > 0;
+  }
+
+  get topMoreLabel() {
+    return this.moreLabel(this.topRemaining);
+  }
+
+  get lowerRemaining() {
+    return Math.max(0, this.lowerBand.length - this.lowerShown);
+  }
+
+  get hasMoreLower() {
+    return this.lowerRemaining > 0;
+  }
+
+  get lowerMoreLabel() {
+    return this.moreLabel(this.lowerRemaining);
+  }
+
+  /**
+   * "Load 10 more · 37 remaining" — the next step AND the size of the tail.
+   *
+   * The remainder is named because a button reading only "Load more" leaves a
+   * reader with no idea whether one case or four hundred sit behind it, which
+   * is the same failure as silently truncating.
+   */
+  moreLabel(remaining) {
+    const next = Math.min(this.PAGE_SIZE, remaining);
+    return remaining === next
+      ? `Load the last ${next} case${next === 1 ? "" : "s"}`
+      : `Load ${next} more · ${remaining} remaining`;
+  }
+
+  handleLoadMoreTop() {
+    this.topShown += this.PAGE_SIZE;
+  }
+
+  handleLoadMoreLower() {
+    this.lowerShown += this.PAGE_SIZE;
   }
 
   get hasLowerBand() {

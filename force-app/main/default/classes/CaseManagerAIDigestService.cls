@@ -599,6 +599,24 @@ public with sharing class CaseManagerAIDigestService {
       ? 'Case_Manager__c != null'
       : 'Case_Manager__c = :runningUser';
 
+    // CLOSED OPPORTUNITIES ONLY. Business decision, 2026-08-27: a case manager
+    // services a case after it closes, so a deal still in flight with sales is
+    // not theirs to triage. IsClosed is the standard flag and reads from the
+    // stage configuration in Setup, so a new stage is classified correctly
+    // without an Apex change — which is why it is used here in preference to a
+    // hard-coded StageName list.
+    //
+    // READ THIS BEFORE ASSUMING IT DROPS CANCELLED CASES. IsClosed is TRUE for
+    // Cancelled as well as for the won stages: measured in production on
+    // 2026-08-27, 1,243 of the 1,948 closed cases carry a case manager and are
+    // Cancelled. Keeping them is the decision that was taken, not an oversight.
+    // What this filter removes is the 188 in-flight sales stages — Build Plan,
+    // Contract Sent, Approved/Ready to close, Submitted to UW, Waiting on Docs.
+    // Cancelled cases are bounded instead by CANCELLATION_DATED's 3-day
+    // threshold, so they no longer flood the alerts, but they do still consume
+    // the MAX_CASES row budget.
+    soql += ' AND IsClosed = true';
+
     // No WITH USER_MODE in the string: queryWithBinds takes the access level
     // as a parameter below, and specifying it twice throws at runtime.
     soql += ' ORDER BY CreatedDate DESC LIMIT :rowLimit';
@@ -1781,42 +1799,90 @@ public with sharing class CaseManagerAIDigestService {
     return String.join(lines, '\n');
   }
 
+  /** How many next actions the card carries. */
+  private static final Integer DO_FIRST_MAX = 3;
+
   /**
    * Up to three next actions, each tied to a trigger that actually fired.
    *
    * Nothing generic: an action only appears because a specific field on a
    * specific case put it there.
+   *
+   * ONE CASE PER ACTION, in rank order. The previous version checked the
+   * three-action cap while walking a single case's triggers, so the first case
+   * carrying three matching findings filled every slot and returned before the
+   * outer loop advanced. That is not a rare shape here: a distressed case
+   * routinely carries UCC risk, In legal and a cancellation date at once, and
+   * because the alerts are ranked worst-first the case that triggered it was
+   * reliably the worst one in the book. Three actions now mean three cases.
+   *
+   * The leftovers are not thrown away. A book with only one or two actionable
+   * cases still fills the card from their remaining findings — breadth first,
+   * depth only to fill the gap. That was the one thing the old loop got right.
    */
   private static List<String> buildDoFirst(MorningDigest digest) {
     List<String> actions = new List<String>();
+    // Two findings can render the same sentence: UCC risk High and Account
+    // stage is UCC both read as "Chase the <case> UCC response".
+    Set<String> seen = new Set<String>();
+    // Second and later actions from a case that has already contributed one.
+    List<String> spare = new List<String>();
+
     for (CaseAlert a : digest.alerts) {
+      Boolean claimed = false;
       for (String t : a.triggers) {
-        if (actions.size() >= 3) {
-          return actions;
+        String action = actionFor(a, t);
+        if (action == null || !seen.add(action)) {
+          continue;
         }
-        if (t.startsWith('UCC risk') || t == 'Account stage is UCC') {
-          actions.add('Chase the ' + a.opportunityName + ' UCC response');
-        } else if (t.startsWith('In legal')) {
-          actions.add(
-            'Get a status update on ' + a.opportunityName + ' from ' +
-            t.removeStart('In legal with ')
-          );
-        } else if (t.startsWith('Second NSF') || t.startsWith('NSF count')) {
-          actions.add(
-            'Call ' + a.opportunityName + ' about the missed draft'
-          );
-        } else if (t.startsWith('Cancellation')) {
-          actions.add('Confirm the cancellation on ' + a.opportunityName);
-        } else if (t.startsWith('In collections')) {
-          actions.add('Review the collections plan for ' + a.opportunityName);
-        } else if (t.startsWith('Drafts as')) {
-          actions.add(
-            'Confirm ' + a.opportunityName + ' drafts as separate plans'
-          );
+        if (claimed) {
+          spare.add(action);
+          continue;
+        }
+        actions.add(action);
+        claimed = true;
+        if (actions.size() >= DO_FIRST_MAX) {
+          return actions;
         }
       }
     }
+
+    for (String action : spare) {
+      if (actions.size() >= DO_FIRST_MAX) {
+        break;
+      }
+      actions.add(action);
+    }
     return actions;
+  }
+
+  /**
+   * The next action one fired trigger implies, or null if it implies none.
+   *
+   * Split out of buildDoFirst so the selection rule (which case, how many) and
+   * the wording (what to do about this finding) stay separately readable.
+   */
+  private static String actionFor(CaseAlert a, String t) {
+    if (t.startsWith('UCC risk') || t == 'Account stage is UCC') {
+      return 'Chase the ' + a.opportunityName + ' UCC response';
+    }
+    if (t.startsWith('In legal')) {
+      return 'Get a status update on ' + a.opportunityName + ' from ' +
+        t.removeStart('In legal with ');
+    }
+    if (t.startsWith('Second NSF') || t.startsWith('NSF count')) {
+      return 'Call ' + a.opportunityName + ' about the missed draft';
+    }
+    if (t.startsWith('Cancellation')) {
+      return 'Confirm the cancellation on ' + a.opportunityName;
+    }
+    if (t.startsWith('In collections')) {
+      return 'Review the collections plan for ' + a.opportunityName;
+    }
+    if (t.startsWith('Drafts as')) {
+      return 'Confirm ' + a.opportunityName + ' drafts as separate plans';
+    }
+    return null;
   }
 
   /**

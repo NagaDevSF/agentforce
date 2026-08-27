@@ -19,7 +19,11 @@ private class CaseManagerAIBookActionTest {
     return new Opportunity(
       Name = name,
       AccountId = a.Id,
-      StageName = 'Signed',
+      // Must be a CLOSED stage: loadBook() filters on IsClosed since
+      // 2026-08-27, and 'Signed' is not a closed stage in any org here,
+      // so a fixture using it produces an empty book and every
+      // assertion below it fails for the wrong reason.
+      StageName = 'Enrolled',
       CloseDate = Date.today().addDays(30),
       Case_Manager__c = UserInfo.getUserId()
     );

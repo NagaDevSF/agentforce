@@ -216,11 +216,110 @@
   }
 }
 
-/* Respect users who have asked for less motion: no caret, no blink. */
+/* ── the shimmer that makes the brief read as being written ──────────────────
+
+   A light sweep travels along the glyphs while the text is still arriving. The
+   gradient is painted on the element and then clipped to the text itself, which
+   is why the markup switches to a plain <span> during typing:
+   background-clip: text cannot reach through lightning-formatted-rich-text's
+   shadow root to the glyphs inside it.
+
+   -webkit-text-fill-color is the property that makes the glyphs transparent so
+   the clipped gradient shows through. It is inherited, so it is reset explicitly
+   the moment typing finishes rather than left to cascade into the finished card.
+
+   The base colour is the same #3b3a39 the finished text uses, so the line does
+   not change colour when the shimmer stops — only the highlight goes away. */
+.cm-shine {
+  /* SAFETY NET, and it is not decoration. The glyphs are painted transparent so
+     the clipped background shows through, which means ANY pixel of text with no
+     background behind it renders INVISIBLE. background-color is clipped to the
+     text too, so it backstops the gradient: if the gradient ever fails to cover
+     a glyph, that glyph falls back to the base colour instead of vanishing.
+     The first version of this shimmer had no such fallback and erased letters
+     as the sweep moved past them. */
+  background-color: #3b3a39;
+  background-image: linear-gradient(
+    100deg,
+    #3b3a39 0%,
+    #3b3a39 38%,
+    #0176d3 47%,
+    #7b9cff 50%,
+    #0176d3 53%,
+    #3b3a39 62%,
+    #3b3a39 100%
+  );
+  /* 300% + a 0%..100% sweep is the pair that guarantees full coverage at every
+     frame. background-position percentages resolve against (element - image),
+     so at 300% the offset runs 0 -> -2W and the image always spans the element:
+     at 0% it covers [0, 3W], at 100% it covers [-2W, W]. The earlier 220% with
+     a 120%..-120% sweep left [0.76W, W] unpainted at one end and the whole line
+     unpainted at the other, which is exactly what erased the text.
+     Do not narrow the size or widen the sweep without redoing that arithmetic. */
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: cm-shine 2.6s linear infinite;
+}
+
+/* The heading is already a muted upper-case label, so it shimmers against its
+   own colour rather than the body's — otherwise the sweep reads as a glitch. */
+.cm-shine--title {
+  background-color: #706e6b;
+  background-image: linear-gradient(
+    100deg,
+    #706e6b 0%,
+    #706e6b 38%,
+    #0176d3 47%,
+    #7b9cff 50%,
+    #0176d3 53%,
+    #706e6b 62%,
+    #706e6b 100%
+  );
+}
+
+/* Both ends of the sweep show pure base colour — the highlight only crosses the
+   text through the middle of the cycle — so the restart is invisible and the
+   shine reads as periodic rather than as a hard loop. */
+@keyframes cm-shine {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+
+/* Respect users who have asked for less motion: no caret, no blink, and a
+   still gradient rather than a sweeping one. The text must stay READABLE, so
+   reduced motion drops back to a flat colour instead of freezing a gradient
+   mid-sweep — a stopped highlight sitting over three words looks like damage. */
 @media (prefers-reduced-motion: reduce) {
   .cm-brief__caret {
     animation: none;
     opacity: 0;
+  }
+
+  .cm-shine {
+    background-image: none;
+    animation: none;
+    -webkit-text-fill-color: #3b3a39;
+  }
+
+  .cm-shine--title {
+    -webkit-text-fill-color: #706e6b;
+  }
+}
+
+/* Windows High Contrast: the clipped gradient renders as invisible text there,
+   so opt out entirely and let the forced palette do its job. */
+@media (forced-colors: active) {
+  .cm-shine {
+    background-image: none;
+    animation: none;
+    -webkit-text-fill-color: currentColor;
   }
 }
 
