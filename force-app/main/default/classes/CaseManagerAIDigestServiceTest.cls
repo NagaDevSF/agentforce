@@ -54,10 +54,11 @@ private class CaseManagerAIDigestServiceTest {
   /**
    * Any active Cancellation_Reason__c value, resolved by describe.
    *
-   * Production carries a validation rule - "Cancellation Reason is required
-   * when Stage is Cancelled" - that SIT does not, so a fixture setting the
-   * stage without the reason passes every sandbox and fails the production
-   * deploy. Found exactly that way on 2026-08-27.
+   * Validation_Rule_for_the_Cancelled - "Cancellation Reason is required when
+   * Stage is Cancelled" - is ACTIVE in production and INACTIVE in SIT. A
+   * fixture that sets the stage without the reason therefore passes every
+   * sandbox run and fails the production deploy. Found exactly that way on
+   * 2026-08-27, after a green 82/82 in SIT.
    *
    * Read by describe rather than hard-coded because the picklist differs
    * between orgs: production offers Graduated and Passed Away, SIT offers
@@ -1332,7 +1333,9 @@ private class CaseManagerAIDigestServiceTest {
     Opportunity o = makeOpp(a, 'Cancelled Case');
     o.StageName = 'Cancelled';
     o.Cancellation_Date__c = Date.today();
-    // Required by a production validation rule that SIT does not carry.
+    // Required by Validation_Rule_for_the_Cancelled, which is ACTIVE in
+    // production and INACTIVE in SIT - so SIT passes either way and cannot
+    // prove this line is needed. Do not remove it on a green sandbox run.
     o.Cancellation_Reason__c = anyCancellationReason();
     insert o;
 
