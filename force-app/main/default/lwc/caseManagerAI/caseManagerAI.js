@@ -3,8 +3,7 @@ import { ShowToastEvent } from "lightning/platformShowToastEvent";
 
 import canViewAllCases from "@salesforce/apex/CaseManagerAIController.canViewAllCases";
 import getMorningDigest from "@salesforce/apex/CaseManagerAIController.getMorningDigest";
-import getAccountOpportunities from "@salesforce/apex/CsCaseManagerDashboardController.getAccountOpportunities";
-import CaseWorkModal from "c/caseWorkModal";
+import { NavigationMixin } from "lightning/navigation";
 
 import USER_ID from "@salesforce/user/Id";
 
@@ -17,10 +16,10 @@ const SUB_MARKER = "\u21B3 ";
 /**
  * Case Manager AI — the morning triage summary for a case manager's book.
  *
- * One mode, wherever the component is dropped: press Generate, Apex reads the
- * running user's whole book and returns a ranked triage, and the card narrates
- * it. Nothing is stored and nothing is scheduled, so every press reflects field
- * values at that moment rather than a 06:30 snapshot.
+ * One mode, wherever the component is dropped: on load, Apex reads the running
+ * user's whole book and returns a ranked triage, and the card narrates it.
+ * Regenerate rebuilds it. Nothing is stored and nothing is scheduled, so every
+ * run reflects field values at that moment rather than a 06:30 snapshot.
  *
  * The ranked, clickable case list and the single-case briefing panel it opened
  * were removed on 2026-08-20 at the team's direction — this component is the
@@ -30,7 +29,7 @@ const SUB_MARKER = "\u21B3 ";
  * Everything is filtered server-side to cases where the running user is the
  * Case Manager; this component never sends a user id.
  */
-export default class CaseManagerAI extends LightningElement {
+export default class CaseManagerAI extends NavigationMixin(LightningElement) {
   @api recordId;
   @api cardTitle = "Case Manager AI";
   /**
@@ -70,7 +69,7 @@ export default class CaseManagerAI extends LightningElement {
 
   isLoadingDigest = false;
 
-  /** True once Generate has been pressed at least once this page view. */
+  /** True once the triage has been requested, automatically or by a press. */
   hasGenerated = false;
 
   /** Characters revealed so far by the typing effect. */
@@ -93,6 +92,10 @@ export default class CaseManagerAI extends LightningElement {
 
   connectedCallback() {
     this.bootstrap();
+    // The first triage builds itself: a case manager landing on the page sees
+    // their book without pressing anything. Not awaited behind bootstrap(), so
+    // the spinner shows at once instead of the resting prompt flashing first.
+    this.handleGenerate();
   }
 
   /** Timers outlive the component unless cleared, so always clear them. */
@@ -115,9 +118,6 @@ export default class CaseManagerAI extends LightningElement {
     // single-case view is reached by picking a case from the list below.
     // `recordId` is still declared so the platform can pass it on a record
     // page; it is intentionally unused.
-    // No else: in list mode the digest is NOT built on page load. It reads the
-    // whole book - around ten queries - and most visits to a Home page are not
-    // a request for a morning triage. The user asks for it with Generate.
   }
 
   // ───────────────────────── data loading ─────────────────────────
@@ -127,12 +127,13 @@ export default class CaseManagerAI extends LightningElement {
    * a case manager reading their caseload.
    */
   /**
-   * Builds the digest on demand.
+   * Builds the digest: once automatically from connectedCallback, then again
+   * on every Regenerate press.
    *
-   * Deliberately not called from connectedCallback. Nothing about this is
-   * scheduled or cached: every press reads the running user's whole book and
-   * recomputes the triage from current field values, so what comes back is
-   * true at the moment it is asked for rather than true at 06:30.
+   * Nothing about this is scheduled or cached: every run reads the running
+   * user's whole book and recomputes the triage from current field values, so
+   * what comes back is true at the moment it is asked for rather than true at
+   * 06:30.
    */
   async handleGenerate() {
     this.hasGenerated = true;
@@ -389,42 +390,25 @@ export default class CaseManagerAI extends LightningElement {
    * The account link is built here rather than in Apex because it is
    * presentation. A relative URL keeps it correct in every org.
    */
-  async handleAccountClick(event) {
-    const accountId = event.currentTarget.dataset.accountId;
-    if (!accountId) return;
-    const opportunityIds = await this._buildOpportunityIds(accountId, null);
-    CaseWorkModal.open({
-      size:                  'full',
-      accountId,
-      opportunityIds,
-      selectedOpportunityId: null,
-      caseIds:               []
+  // Links open the standard record pages (a Console tab each) instead of
+  // the old client-workspace modal.
+  _navigateToRecord(recordId, objectApiName) {
+    if (!recordId) return;
+    this[NavigationMixin.Navigate]({
+      type: "standard__recordPage",
+      attributes: { recordId, objectApiName, actionName: "view" }
     });
   }
 
-  async handleCaseClick(event) {
-    const accountId     = event.currentTarget.dataset.accountId;
-    const opportunityId = event.currentTarget.dataset.opportunityId;
-    if (!accountId) return;
-    const opportunityIds = await this._buildOpportunityIds(accountId, opportunityId);
-    CaseWorkModal.open({
-      size:                  'full',
-      accountId,
-      opportunityIds,
-      selectedOpportunityId: opportunityId || null,
-      caseIds:               []
-    });
+  handleAccountClick(event) {
+    this._navigateToRecord(event.currentTarget.dataset.accountId, "Account");
   }
 
-  async _buildOpportunityIds(accountId, specificOppId) {
-    try {
-      const allIds = (await getAccountOpportunities({ accountId })) || [];
-      if (!specificOppId) return allIds;
-      const rest = allIds.filter(id => id !== specificOppId);
-      return [specificOppId, ...rest];
-    } catch (e) {
-      return specificOppId ? [specificOppId] : [];
-    }
+  // Each alert card is an opportunity; fall back to its account if unlinked.
+  handleCaseClick(event) {
+    const { opportunityId, accountId } = event.currentTarget.dataset;
+    if (opportunityId) this._navigateToRecord(opportunityId, "Opportunity");
+    else this._navigateToRecord(accountId, "Account");
   }
 
   decorate(alerts) {
@@ -444,7 +428,7 @@ export default class CaseManagerAI extends LightningElement {
     }));
   }
 
-  /** Before the first press there is nothing to report, and that is not a fault. */
+  /** Only before the automatic first run has started; kept as a safe fallback. */
   get showPrompt() {
     return !this.hasGenerated && !this.isLoadingDigest;
   }

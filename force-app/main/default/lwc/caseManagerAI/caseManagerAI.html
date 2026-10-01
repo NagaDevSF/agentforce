@@ -135,7 +135,7 @@
                                 data-account-id={c.accountId}
                                 data-opportunity-id={c.id}
                                 onclick={handleCaseClick}
-                                title="Open in CS Workspace">{c.name}</button>
+                                title="Open opportunity">{c.name}</button>
                       </template>
                       <template if:true={c.notLinked}>
                         <span class="cm-card__name">{c.name}</span>
@@ -145,7 +145,7 @@
                                 class="cm-card__account"
                                 data-account-id={c.accountId}
                                 onclick={handleAccountClick}
-                                title="Open account in CS Workspace">{c.accountName}</button>
+                                title="Open account">{c.accountName}</button>
                       </template>
                     </div>
                     <ul class="cm-card__findings">
@@ -190,7 +190,7 @@
                                     data-account-id={c.accountId}
                                     data-opportunity-id={c.id}
                                     onclick={handleCaseClick}
-                                    title="Open in CS Workspace">{c.name}</button>
+                                    title="Open opportunity">{c.name}</button>
                           </template>
                           <template if:true={c.notLinked}>
                             <span class="cm-card__name">{c.name}</span>
