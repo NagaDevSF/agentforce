@@ -406,6 +406,9 @@
   color: var(--pc-blue);
   --slds-c-icon-color-foreground-default: var(--pc-blue);
 }
+.pc-text-amber {
+  color: var(--pc-amber);
+}
 .pc-text-gray {
   color: var(--pc-gray);
 }

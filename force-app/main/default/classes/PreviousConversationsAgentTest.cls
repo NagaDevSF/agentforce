@@ -36,6 +36,7 @@ private class PreviousConversationsAgentTest {
       ActivityDate = Date.today()
     );
     PreviousConversationsService.mockCalls = new List<PreviousConversationsService.Entry>();
+    PreviousConversationsAgent.mockPaymentProblems = new List<Payment_Schedule_Item__c>();
     return o;
   }
 
@@ -58,7 +59,7 @@ private class PreviousConversationsAgentTest {
     PreviousConversationsAgent.Summary s = ans.summary;
     System.assertNotEquals(null, s, 'The JSON must be parsed into a Summary.');
     System.assert(s.overallSummary.startsWith('The client is enrolled'), 'overall summary');
-    System.assertEquals('Positive', s.sentimentLabel, 'sentiment label');
+    System.assertEquals('Good', s.sentimentLabel, 'Positive from the model is shown as Good');
     System.assertEquals('The client thanked the team.', s.sentimentNote, 'sentiment note');
     System.assertEquals(2, s.keyInsights.size(), 'two insights');
     System.assertEquals(1, s.customerConcerns.size(), 'one concern');
@@ -326,5 +327,184 @@ private class PreviousConversationsAgentTest {
     Test.stopTest();
 
     System.assert(refused, 'An unreadable case must be refused, never answered by the model.');
+  }
+
+  // ───────────────────────── Sentiment rules (23 Oct 2026) ─────────────────────────
+
+  private static PreviousConversationsAgent.Summary summaryWith(String label, String note) {
+    PreviousConversationsAgent.Summary s = new PreviousConversationsAgent.Summary();
+    s.sentimentLabel = label;
+    s.sentimentNote = note;
+    return s;
+  }
+
+  private static PreviousConversationsAgent.Facts facts(Integer payments, Integer inARow) {
+    PreviousConversationsAgent.Facts f = new PreviousConversationsAgent.Facts();
+    f.paymentProblems = payments;
+    f.unansweredInARow = inARow;
+    f.latestPaymentProblem = payments > 0 ? 'NSF on Oct 3, 2026' : null;
+    return f;
+  }
+
+  @IsTest
+  static void failingPaymentsMakeAGoodClientNeedAttention() {
+    PreviousConversationsAgent.Summary s = summaryWith('Good', 'Polite emails.');
+    PreviousConversationsAgent.applySentimentRules(s, facts(2, 0));
+    System.assertEquals('Needs Attention', s.sentimentLabel);
+    System.assert(s.sentimentNote.contains('2 missed or failed payments'), s.sentimentNote);
+    System.assert(s.sentimentNote.contains('NSF on Oct 3, 2026'), s.sentimentNote);
+  }
+
+  @IsTest
+  static void failingPaymentsOverrideNeutralToo() {
+    PreviousConversationsAgent.Summary s = summaryWith('Neutral', 'Not answering.');
+    PreviousConversationsAgent.applySentimentRules(s, facts(1, 4));
+    System.assertEquals('Needs Attention', s.sentimentLabel, 'payments outrank not answering');
+    System.assert(s.sentimentNote.contains('1 missed or failed payment '), s.sentimentNote);
+  }
+
+  @IsTest
+  static void unhappyOutranksPayments() {
+    PreviousConversationsAgent.Summary s = summaryWith('Unhappy', 'Asked how to cancel the program.');
+    PreviousConversationsAgent.applySentimentRules(s, facts(3, 5));
+    System.assertEquals('Unhappy', s.sentimentLabel);
+    System.assertEquals('Asked how to cancel the program.', s.sentimentNote, 'the model reason is kept');
+  }
+
+  @IsTest
+  static void threeUnansweredCallsInARowIsNeutral() {
+    PreviousConversationsAgent.Summary s = summaryWith('Good', 'Fine.');
+    PreviousConversationsAgent.applySentimentRules(s, facts(0, 3));
+    System.assertEquals('Neutral', s.sentimentLabel);
+    System.assert(s.sentimentNote.contains('3 unanswered calls in a row'), s.sentimentNote);
+
+    PreviousConversationsAgent.Summary two = summaryWith('Good', 'Fine.');
+    PreviousConversationsAgent.applySentimentRules(two, facts(0, 2));
+    System.assertEquals('Good', two.sentimentLabel, 'two missed calls is not a pattern yet');
+  }
+
+  @IsTest
+  static void modelNeedsAttentionForRudenessIsKept() {
+    PreviousConversationsAgent.Summary s = summaryWith('Needs Attention', 'Client shouted at the agent.');
+    PreviousConversationsAgent.applySentimentRules(s, facts(0, 0));
+    System.assertEquals('Needs Attention', s.sentimentLabel);
+    System.assertEquals('Client shouted at the agent.', s.sentimentNote);
+  }
+
+  @IsTest
+  static void oldAndOddLabelsMapToTheFive() {
+    System.assertEquals('Good', PreviousConversationsAgent.normaliseLabel('Positive'));
+    System.assertEquals('Needs Attention', PreviousConversationsAgent.normaliseLabel('negative'));
+    System.assertEquals('Needs Attention', PreviousConversationsAgent.normaliseLabel('Bad'));
+    System.assertEquals('Unhappy', PreviousConversationsAgent.normaliseLabel(' unhappy '));
+    System.assertEquals('Neutral', PreviousConversationsAgent.normaliseLabel('Neutral'));
+    System.assertEquals('Unknown', PreviousConversationsAgent.normaliseLabel('Ecstatic'));
+    System.assertEquals('Unknown', PreviousConversationsAgent.normaliseLabel(null));
+  }
+
+  @IsTest
+  static void factsCountUnansweredCallsUntilTheClientPicksUp() {
+    PreviousConversationsService.History h = new PreviousConversationsService.History();
+    Date d = Date.today();
+    // Newest first: three missed outbound calls, then one the client took, then one more missed.
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '1', d, '15:00', 'A', null, 'outbound', 10));
+    h.entries.add(PreviousConversationsService.callEntry('8x8', '2', d, '14:00', 'A', null, 'OUTBOUND', 25));
+    h.entries.add(PreviousConversationsService.callEntry('Convoso', '3', d, '13:00', 'A', null, 'Not Available', 70));
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '4', d, '12:00', 'A', null, 'outbound', 300));
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '5', d, '11:00', 'A', null, 'outbound', 5));
+    PreviousConversationsAgent.mockPaymentProblems = new List<Payment_Schedule_Item__c>{
+      new Payment_Schedule_Item__c(Status__c = 'NSF', Payment_Date__c = Date.newInstance(2026, 10, 3)),
+      new Payment_Schedule_Item__c(Status__c = 'Missed', Payment_Date__c = Date.newInstance(2026, 9, 3))
+    };
+
+    PreviousConversationsAgent.Facts f = PreviousConversationsAgent.gatherFacts(null, h);
+
+    System.assertEquals(3, f.unansweredInARow, 'the streak stops at the answered call');
+    System.assertEquals(4, f.unansweredRecent, 'all four missed calls are recent');
+    System.assertEquals(2, f.paymentProblems);
+    System.assertEquals('NSF on Oct 3, 2026', f.latestPaymentProblem);
+    String text = PreviousConversationsAgent.factsText(f);
+    System.assert(text.contains('payments in the last 90 days: 2 (latest: NSF on Oct 3, 2026)'), text);
+    System.assert(text.contains('in a row, most recent first: 3'), text);
+  }
+
+  @IsTest
+  static void anInboundCallEndsTheStreak() {
+    PreviousConversationsService.History h = new PreviousConversationsService.History();
+    Date d = Date.today();
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '1', d, '15:00', 'A', null, 'outbound', 10));
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '2', d, '14:00', 'A', null, 'inbound', 8));
+    h.entries.add(PreviousConversationsService.callEntry('Talkdesk', '3', d, '13:00', 'A', null, 'outbound', 10));
+    PreviousConversationsAgent.mockPaymentProblems = new List<Payment_Schedule_Item__c>();
+
+    PreviousConversationsAgent.Facts f = PreviousConversationsAgent.gatherFacts(null, h);
+
+    System.assertEquals(1, f.unansweredInARow, 'the client called us, so they are responding');
+  }
+
+  @IsTest
+  static void callEntryMarksMissedCalls() {
+    Date d = Date.newInstance(2026, 10, 20);
+    PreviousConversationsService.Entry shortOut = PreviousConversationsService.callEntry('Talkdesk', 'a', d, '10:00', 'A', null, 'outbound', 12);
+    PreviousConversationsService.Entry longOut = PreviousConversationsService.callEntry('Talkdesk', 'b', d, '10:00', 'A', null, 'outbound', 45);
+    PreviousConversationsService.Entry exactly30 = PreviousConversationsService.callEntry('Talkdesk', 'c', d, '10:00', 'A', null, 'outbound', 30);
+    PreviousConversationsService.Entry shortIn = PreviousConversationsService.callEntry('Talkdesk', 'd', d, '10:00', 'A', null, 'inbound', 5);
+    PreviousConversationsService.Entry machine = PreviousConversationsService.callEntry('Convoso', 'e', d, '10:00', 'A', null, 'Answering Machine', 60);
+    PreviousConversationsService.Entry spoke = PreviousConversationsService.callEntry('Convoso', 'f', d, '10:00', 'A', null, 'Spoke to Customer', 10);
+    PreviousConversationsService.Entry unknown = PreviousConversationsService.callEntry('Talkdesk', 'g', d, '10:00', 'A', null, 'outbound', null);
+
+    System.assertEquals(true, shortOut.unanswered, 'outbound under 30 s is not answered');
+    System.assertEquals('Call: Outbound, 0:12, not answered', shortOut.title);
+    System.assertEquals(false, longOut.unanswered);
+    System.assertEquals('Call: Outbound, 0:45', longOut.title);
+    System.assertEquals(false, exactly30.unanswered, '30 s is not under 30 s');
+    System.assertEquals(false, shortIn.unanswered, 'the client called us');
+    System.assertEquals(false, shortIn.outbound);
+    System.assertEquals(true, machine.unanswered, 'Convoso no-contact outcome');
+    System.assertEquals('Call: Outbound, 1:00, Answering Machine, not answered', machine.title);
+    System.assertEquals(false, spoke.unanswered, 'a real conversation, however short');
+    System.assertEquals(false, unknown.unanswered, 'no length means we cannot tell');
+  }
+
+  @IsTest
+  static void readsTheDurationTheDataCloudReturns() {
+    System.assertEquals(96, PreviousConversationsService.parseSeconds('96.000000000000000000'));
+    System.assertEquals(28, PreviousConversationsService.parseSeconds('28'));
+    System.assertEquals(null, PreviousConversationsService.parseSeconds('n/a'));
+    System.assertEquals(null, PreviousConversationsService.parseSeconds(null));
+  }
+
+  @IsTest
+  static void summaryPromptCarriesTheFactsAndTheRules() {
+    String p = PreviousConversationsAgent.prompt('- [Mon] Task: hello', null, 'Missed, failed or NSF payments in the last 90 days: 1.');
+    System.assert(p.contains('FACTS (from Salesforce records, reliable)'), 'facts block');
+    System.assert(p.contains('Unhappy, Needs Attention, Neutral, Good, Unknown'), 'the five labels');
+    System.assert(p.contains('cancel the program'), 'the Unhappy rule');
+    System.assert(p.indexOf('FACTS') < p.indexOf('TRANSCRIPT'), 'facts come before the transcript');
+    System.assert(!PreviousConversationsAgent.prompt('- x', null).contains('FACTS (from Salesforce records'), 'no facts, no block');
+  }
+
+  @IsTest
+  static void aGoodReplyWithFailingPaymentsShowsNeedsAttention() {
+    Opportunity o = makeCase();
+    PreviousConversationsAgent.mockPaymentProblems = new List<Payment_Schedule_Item__c>{
+      new Payment_Schedule_Item__c(Status__c = 'Failed', Payment_Date__c = Date.today().addDays(-5))
+    };
+    PreviousConversationsAgent.mockReply = CARD_JSON;
+
+    Test.startTest();
+    PreviousConversationsAgent.Answer ans = PreviousConversationsAgent.ask(o.Id, null, null);
+    Test.stopTest();
+
+    System.assertEquals('Needs Attention', ans.summary.sentimentLabel, 'payments override the model');
+    System.assert(ans.summary.sentimentNote.startsWith('1 missed or failed payment'), ans.summary.sentimentNote);
+  }
+
+  @IsTest
+  static void thePaymentReaderQueriesWithoutError() {
+    Opportunity o = makeCase();
+    PreviousConversationsAgent.mockPaymentProblems = null;
+    PreviousConversationsAgent.Facts f = PreviousConversationsAgent.gatherFacts(o.Id, new PreviousConversationsService.History());
+    System.assertEquals(0, f.paymentProblems, 'a new case has no payment problems');
   }
 }

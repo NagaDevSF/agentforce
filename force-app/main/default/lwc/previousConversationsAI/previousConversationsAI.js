@@ -323,17 +323,23 @@ export default class PreviousConversationsAI extends LightningElement {
     return this.summary?.sentimentNote;
   }
 
+  /**
+   * Good green, Neutral blue, Needs Attention amber, Unhappy red, Unknown gray.
+   * Positive / Negative are older words for Good / Needs Attention.
+   */
   get sentimentTone() {
     const label = this.sentimentLabel.toLowerCase();
-    if (label === 'positive') return 'green';
-    if (label === 'negative') return 'red';
+    if (label === 'good' || label === 'positive') return 'green';
     if (label === 'neutral') return 'blue';
+    if (label === 'needs attention' || label === 'negative') return 'amber';
+    if (label === 'unhappy') return 'red';
     return 'gray';
   }
 
   get sentimentIcon() {
     const tone = this.sentimentTone;
     if (tone === 'green') return 'utility:like';
+    if (tone === 'amber') return 'utility:warning';
     if (tone === 'red') return 'utility:dislike';
     return 'utility:info';
   }

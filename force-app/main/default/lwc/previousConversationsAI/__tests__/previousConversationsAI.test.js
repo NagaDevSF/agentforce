@@ -109,10 +109,13 @@ describe('c-previous-conversations-ai', () => {
   });
 
   it.each([
-    ['Positive', 'pc-text-green', 'pc-tone-green'],
+    ['Good', 'pc-text-green', 'pc-tone-green'],
     ['Neutral', 'pc-text-blue', 'pc-tone-blue'],
-    ['Negative', 'pc-text-red', 'pc-tone-red'],
-    ['Unknown', 'pc-text-gray', 'pc-tone-gray']
+    ['Needs Attention', 'pc-text-amber', 'pc-tone-amber'],
+    ['Unhappy', 'pc-text-red', 'pc-tone-red'],
+    ['Unknown', 'pc-text-gray', 'pc-tone-gray'],
+    ['Positive', 'pc-text-green', 'pc-tone-green'],
+    ['Negative', 'pc-text-amber', 'pc-tone-amber']
   ])('colors %s sentiment', async (label, textClass, iconClass) => {
     const el = mount();
     await flush();
