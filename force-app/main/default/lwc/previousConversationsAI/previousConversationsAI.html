@@ -1,0 +1,289 @@
+<template>
+  <article class="pc-shell">
+    <!-- ── Header: client and record link ── -->
+    <header class="pc-header">
+      <div class="pc-avatar" aria-hidden="true">{initials}</div>
+      <div class="pc-header-text">
+        <h2 class="pc-name">{caseName}</h2>
+        <p class="pc-sub">Previous conversations from calls, emails, notes and tasks</p>
+      </div>
+      <div class="pc-header-actions" if:true={hasCase}>
+        <button type="button" class="pc-btn" onclick={handleViewRecord}>
+          <lightning-icon icon-name="utility:new_window" size="x-small" alternative-text=""></lightning-icon>
+          <span>View record</span>
+        </button>
+      </div>
+    </header>
+
+    <div if:true={showPicker} class="pc-picker">
+      <lightning-record-picker
+        label="Case"
+        placeholder="Search cases…"
+        object-api-name="Opportunity"
+        onchange={handlePick}
+      ></lightning-record-picker>
+    </div>
+
+    <p if:true={needsCase} class="pc-quiet">Pick a case to see everything that has been said on it.</p>
+
+    <div if:true={loading} class="pc-loading">
+      <lightning-spinner alternative-text="Loading conversations" size="small"></lightning-spinner>
+    </div>
+
+    <p if:true={error} class="pc-error" role="alert">{error}</p>
+
+    <template if:true={hasCase}>
+      <!-- ── AI Summary hero ── -->
+      <section class="pc-hero" aria-labelledby="pc-ai-title">
+        <div class="pc-hero-head">
+          <span class="pc-hero-icon" aria-hidden="true">
+            <lightning-icon icon-name="utility:einstein" size="small" variant="inverse" alternative-text=""></lightning-icon>
+          </span>
+          <div class="pc-hero-title">
+            <h3 id="pc-ai-title" class="pc-ai-title">AI Summary</h3>
+            <p class="pc-ai-sub">Complete overview from calls, emails and notes</p>
+          </div>
+          <div class="pc-hero-meta">
+            <span if:true={lastUpdated} class="pc-updated">{lastUpdated}</span>
+            <span class="pc-ai-badge">AI-generated</span>
+            <button
+              type="button"
+              class="pc-btn pc-btn-primary"
+              disabled={askDisabled}
+              onclick={handleGenerate}
+            >
+              {generateLabel}
+            </button>
+          </div>
+        </div>
+
+        <p if:true={agentUnset} class="pc-quiet">The AI Summary is not available in this org yet.</p>
+
+        <div if:true={showSummaryPrompt} class="pc-hero-empty">
+          Press <b>Generate AI Summary</b> to read every call, email and note on this case and get the
+          summary, sentiment, concerns and next actions. Nothing is generated until you press it.
+        </div>
+
+        <div if:true={askingSummary} class="pc-loading">
+          <lightning-spinner alternative-text="Generating the AI Summary" size="small"></lightning-spinner>
+        </div>
+
+        <p if:true={agentError} class="pc-error" role="alert" aria-live="assertive">{agentError}</p>
+        <p if:true={agentNotice} class="pc-notice" aria-live="polite">{agentNotice}</p>
+
+        <!-- Overall Summary + Customer Sentiment -->
+        <div if:true={hasSummary} class="pc-hero-grid">
+          <div class="pc-box pc-overall">
+            <span class="pc-box-icon pc-tone-violet" aria-hidden="true">
+              <lightning-icon icon-name="utility:summary" size="x-small" alternative-text=""></lightning-icon>
+            </span>
+            <div>
+              <h4 class="pc-box-title">Overall Summary</h4>
+              <p class="pc-overall-text">{overallSummary}</p>
+            </div>
+          </div>
+          <div class="pc-box pc-sentiment">
+            <span class={sentimentIconClass} aria-hidden="true">
+              <lightning-icon icon-name={sentimentIcon} size="small" alternative-text=""></lightning-icon>
+            </span>
+            <div>
+              <span class="pc-small-label">Customer Sentiment</span>
+              <span class={sentimentLabelClass}>{sentimentLabel}</span>
+              <p if:true={sentimentNote} class="pc-muted">{sentimentNote}</p>
+            </div>
+          </div>
+        </div>
+
+        <div if:true={hasSummaryText} class="pc-box pc-overall">
+          <span class="pc-box-icon pc-tone-violet" aria-hidden="true">
+            <lightning-icon icon-name="utility:summary" size="x-small" alternative-text=""></lightning-icon>
+          </span>
+          <div>
+            <h4 class="pc-box-title">Overall Summary</h4>
+            <p class="pc-overall-text">{summaryText}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Counts + next key meeting ── -->
+      <section class="pc-stats" aria-label="Conversation counts">
+        <div class="pc-stat">
+          <span class="pc-round-icon pc-tone-green" aria-hidden="true">
+            <lightning-icon icon-name="utility:call" size="small" alternative-text=""></lightning-icon>
+          </span>
+          <div>
+            <span class="pc-stat-num">{stats.calls}</span>
+            <span class="pc-stat-label">Calls</span>
+            <span class="pc-muted">Logged calls (date, time, who and length)</span>
+          </div>
+        </div>
+        <div class="pc-stat">
+          <span class="pc-round-icon pc-tone-blue" aria-hidden="true">
+            <lightning-icon icon-name="utility:email" size="small" alternative-text=""></lightning-icon>
+          </span>
+          <div>
+            <span class="pc-stat-num">{stats.emails}</span>
+            <span class="pc-stat-label">Emails</span>
+            <span class="pc-muted">Sent and received</span>
+          </div>
+        </div>
+        <div class="pc-stat">
+          <span class="pc-round-icon pc-tone-violet" aria-hidden="true">
+            <lightning-icon icon-name="utility:note" size="small" alternative-text=""></lightning-icon>
+          </span>
+          <div>
+            <span class="pc-stat-num">{stats.notes}</span>
+            <span class="pc-stat-label">Notes</span>
+            <span class="pc-muted">Internal notes on this client</span>
+          </div>
+        </div>
+        <div class="pc-stat pc-meeting">
+          <span class="pc-round-icon pc-tone-red" aria-hidden="true">
+            <lightning-icon icon-name="utility:event" size="small" alternative-text=""></lightning-icon>
+          </span>
+          <div>
+            <span class="pc-small-label">Next Key Meeting</span>
+            <template if:true={hasMeeting}>
+              <span class="pc-meeting-title">{meeting.title}</span>
+              <span class="pc-muted">{meeting.when}</span>
+            </template>
+            <span if:false={hasMeeting} class="pc-muted">Shows here after the AI Summary finds one.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Insights, concerns, next actions ── -->
+      <section if:true={hasSummary} class="pc-columns">
+        <div class="pc-col pc-col-green">
+          <h4 class="pc-col-title">
+            <lightning-icon icon-name="utility:check" size="x-small" alternative-text=""></lightning-icon>
+            Key Insights
+          </h4>
+          <ul if:true={hasKeyInsights} class="pc-bullets">
+            <template for:each={keyInsights} for:item="k">
+              <li key={k.id}><span class="pc-dot pc-tone-green" aria-hidden="true"></span>{k.text}</li>
+            </template>
+          </ul>
+          <p if:false={hasKeyInsights} class="pc-muted">None found.</p>
+        </div>
+
+        <div class="pc-col pc-col-red">
+          <h4 class="pc-col-title pc-text-red">
+            <lightning-icon icon-name="utility:warning" size="x-small" alternative-text=""></lightning-icon>
+            Customer Concerns
+          </h4>
+          <ul if:true={hasCustomerConcerns} class="pc-bullets">
+            <template for:each={customerConcerns} for:item="c">
+              <li key={c.id}><span class="pc-dot pc-tone-amber" aria-hidden="true"></span>{c.text}</li>
+            </template>
+          </ul>
+          <p if:false={hasCustomerConcerns} class="pc-muted">No concerns found.</p>
+        </div>
+
+        <div class="pc-col pc-col-blue">
+          <h4 class="pc-col-title pc-text-blue">
+            <lightning-icon icon-name="utility:target" size="x-small" alternative-text=""></lightning-icon>
+            Recommended Next Actions
+          </h4>
+          <ul if:true={hasNextActions} class="pc-actions">
+            <template for:each={nextActions} for:item="a">
+              <li key={a.id}>
+                <span class="pc-action-text">{a.action}</span>
+                <span if:true={a.hasPriority} class={a.priorityClass}>{a.priority}</span>
+                <span if:true={a.hasDue} class="pc-due">{a.due}</span>
+              </li>
+            </template>
+          </ul>
+          <p if:false={hasNextActions} class="pc-muted">No next actions suggested.</p>
+        </div>
+      </section>
+
+      <!-- ── Ask a question ── -->
+      <section class="pc-ask" aria-label="Ask about this case">
+        <div class="pc-ask-row" onkeyup={handleQuestionKey}>
+          <lightning-input
+            type="text"
+            label="Ask about this case"
+            variant="label-hidden"
+            placeholder="Ask about this case, e.g. When was the last call?"
+            value={question}
+            onchange={handleQuestion}
+            class="pc-ask-input"
+          ></lightning-input>
+          <button type="button" class="pc-btn" disabled={questionDisabled} onclick={handleAsk}>{askLabel}</button>
+        </div>
+        <div if:true={hasAnswer} class="pc-answer" aria-live="polite">
+          <span class="pc-small-label">{askedQuestion}</span>
+          <p>{answer}</p>
+        </div>
+      </section>
+
+      <p if:true={notice} class="pc-notice">{notice}</p>
+
+      <!-- ── Recent Communications ── -->
+      <section class="pc-comms" aria-labelledby="pc-comms-title">
+        <div class="pc-comms-head">
+          <span class="pc-round-icon pc-tone-violet" aria-hidden="true">
+            <lightning-icon icon-name="utility:comments" size="small" alternative-text=""></lightning-icon>
+          </span>
+          <div class="pc-comms-title-wrap">
+            <h3 id="pc-comms-title" class="pc-comms-title">Recent Communications</h3>
+            <span class="pc-muted">Combined view of calls, emails, notes and tasks · {communicationsCount}</span>
+          </div>
+          <div class="pc-comms-tools">
+            <lightning-input
+              type="search"
+              label="Search communications"
+              variant="label-hidden"
+              placeholder="Search communications…"
+              value={searchTerm}
+              onchange={handleSearch}
+              class="pc-search"
+            ></lightning-input>
+            <lightning-combobox
+              label="Type"
+              variant="label-hidden"
+              value={typeFilter}
+              options={typeOptions}
+              onchange={handleTypeFilter}
+              class="pc-type"
+            ></lightning-combobox>
+          </div>
+        </div>
+
+        <p if:true={isEmpty} class="pc-quiet">Nothing has been recorded on this case yet.</p>
+        <p if:true={communicationsEmpty} class="pc-quiet">No communications match this search.</p>
+
+        <ul if:true={hasCommunications} class="pc-comm-list">
+          <template for:each={communications} for:item="c">
+            <li key={c.key} class="pc-comm">
+              <span class={c.iconClass} aria-hidden="true">
+                <lightning-icon icon-name={c.icon} size="x-small" alternative-text=""></lightning-icon>
+              </span>
+              <div class="pc-comm-when">
+                <span class="pc-comm-date">{c.dateLine}</span>
+                <span class="pc-muted">{c.timeLabel}</span>
+              </div>
+              <span class={c.pillClass} title={c.fullKind}>{c.kindLabel}</span>
+              <div class="pc-comm-main">
+                <span class="pc-comm-title">{c.title}</span>
+                <p if:true={c.hasDetail} class="pc-comm-detail">{c.detail}</p>
+                <span if:true={c.hasWho} class="pc-muted">{c.who}</span>
+              </div>
+              <div class="pc-comm-source">
+                <a if:true={c.isRecording} href={c.link} target="_blank" rel="noopener noreferrer" class="pc-link">
+                  Recording
+                  <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text="opens in a new tab"></lightning-icon>
+                </a>
+                <button if:true={c.openable} type="button" class="pc-link-btn" data-key={c.key} onclick={handleOpenSource}>
+                  View source
+                  <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text=""></lightning-icon>
+                </button>
+              </div>
+            </li>
+          </template>
+        </ul>
+      </section>
+    </template>
+  </article>
+</template>

@@ -1,0 +1,284 @@
+<title>Previous Conversation Summary AI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column. Status tiles first, then the colored "how it works" pipeline,
+   the card map, components, Prod steps, decisions and the dated build log. Violet = AI. */
+:root {
+  --bg: #f5f6fb;
+  --surface: #ffffff;
+  --ink: #15203a;
+  --muted: #5a6680;
+  --line: #e1e5ef;
+  --ai: #6d28d9; --ai-soft: #f0eafe;
+  --green: #15803d; --green-soft: #e6f5ea;
+  --blue: #1d4ed8; --blue-soft: #e8effe;
+  --amber: #b45309; --amber-soft: #fdf1e0;
+  --red: #b91c1c; --red-soft: #fdecec;
+  --teal: #0f766e; --teal-soft: #e0f4f1;
+  --gray: #475467; --gray-soft: #eef1f5;
+  --code-bg: #111a2e; --code-ink: #dce6f6;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1320; --surface: #161d2d; --ink: #e7ecf6; --muted: #9aa5bb; --line: #263046;
+    --ai: #b79cf7; --ai-soft: #251c40;
+    --green: #6fd894; --green-soft: #13301f; --blue: #8ab0ff; --blue-soft: #17233f;
+    --amber: #f5b55b; --amber-soft: #33260f; --red: #f59a9a; --red-soft: #3a1717;
+    --teal: #5fd4c3; --teal-soft: #12302c; --gray: #a7b1c2; --gray-soft: #1e2636;
+    --code-bg: #090d17; --code-ink: #dce6f6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1320; --surface: #161d2d; --ink: #e7ecf6; --muted: #9aa5bb; --line: #263046;
+  --ai: #b79cf7; --ai-soft: #251c40;
+  --green: #6fd894; --green-soft: #13301f; --blue: #8ab0ff; --blue-soft: #17233f;
+  --amber: #f5b55b; --amber-soft: #33260f; --red: #f59a9a; --red-soft: #3a1717;
+  --teal: #5fd4c3; --teal-soft: #12302c; --gray: #a7b1c2; --gray-soft: #1e2636;
+  --code-bg: #090d17; --code-ink: #dce6f6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 72px;
+}
+.wrap { max-width: 1000px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.1rem, 5.5vw, 3.2rem); font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.4rem, 3vw, 1.8rem); font-weight: 800; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+a { color: var(--ai); }
+code { font-family: var(--font-mono); font-size: 0.85em; background: var(--ai-soft); color: var(--ink); padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+section { display: grid; gap: 16px; min-width: 0; }
+.lede { color: var(--muted); font-size: 1.05rem; }
+.eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ai); }
+button:focus-visible, a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+header.top { display: grid; gap: 12px; }
+.links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-weight: 600; font-size: 0.95rem; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.tile { border-radius: 16px; padding: 16px 18px; display: grid; gap: 6px; min-width: 0; background: var(--soft); color: var(--c); }
+.tile .k { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.tile b { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.2; }
+.tile span:last-child { color: var(--ink); font-size: 0.92rem; }
+.t-green { --c: var(--green); --soft: var(--green-soft); }
+.t-amber { --c: var(--amber); --soft: var(--amber-soft); }
+.t-blue { --c: var(--blue); --soft: var(--blue-soft); }
+.t-gray { --c: var(--gray); --soft: var(--gray-soft); }
+.t-ai { --c: var(--ai); --soft: var(--ai-soft); }
+.t-teal { --c: var(--teal); --soft: var(--teal-soft); }
+.t-red { --c: var(--red); --soft: var(--red-soft); }
+
+.pipe { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.pipe li { position: relative; background: var(--soft); border-top: 5px solid var(--c); border-radius: 12px; padding: 14px 12px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.pipe .n { width: 30px; height: 30px; border-radius: 50%; background: var(--c); color: var(--surface); display: grid; place-items: center; font-weight: 800; font-family: var(--font-display); }
+.pipe b { color: var(--c); font-family: var(--font-display); font-size: 1rem; line-height: 1.2; }
+.pipe span { font-size: 0.88rem; }
+.pipe .cost { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c); }
+@media (max-width: 860px) { .pipe { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .pipe { grid-template-columns: minmax(0, 1fr); } }
+
+.cardmap { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+.cm { background: var(--soft); color: var(--c); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.cm b { font-size: 0.95rem; }
+.cm span { color: var(--ink); font-size: 0.85rem; }
+.span6 { grid-column: span 6; } .span4 { grid-column: span 4; } .span2 { grid-column: span 2; } .span3 { grid-column: span 3; }
+.span1-5 { grid-column: span 3; }
+@media (max-width: 720px) { .cardmap { grid-template-columns: minmax(0, 1fr); } .cardmap > * { grid-column: auto; } }
+
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.nowrap { white-space: nowrap; }
+.pill { display: inline-block; white-space: nowrap; font-size: 0.78rem; font-weight: 700; border-radius: 999px; padding: 2px 10px; background: var(--soft); color: var(--c); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; counter-reset: s; }
+.steps > li { counter-increment: s; position: relative; padding-left: 44px; }
+.steps > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--ai); color: var(--surface); display: grid; place-items: center; font-weight: 800; font-family: var(--font-display); }
+.copy { display: grid; gap: 6px; margin-top: 8px; }
+.copy-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+pre { margin: 0; background: var(--code-bg); color: var(--code-ink); font-family: var(--font-mono); font-size: 0.83rem; line-height: 1.55; padding: 12px 14px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.btn { font: inherit; font-size: 0.85rem; font-weight: 700; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
+.btn:hover { border-color: var(--ai); color: var(--ai); }
+
+.callout { border-radius: 14px; padding: 14px 16px; background: var(--soft); display: grid; gap: 6px; }
+.callout b { color: var(--c); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 8px; min-width: 0; }
+.panel ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <span class="eyebrow">DCG · Case Managers · Build guide</span>
+  <h1>Previous Conversation Summary AI</h1>
+  <p class="lede">One card on the Opportunity that lists everything already said to a client (emails, tasks, meetings, notes, case comments and calls) and, at the press of a button, writes an AI Summary of it: overall summary, sentiment, key insights, concerns, next actions and the next meeting.</p>
+  <div class="links">
+    <a href="https://app.asana.com/1/1207860012563297/project/1211080260491726/task/1217958144750201" target="_blank" rel="noopener">Asana task</a>
+    <span>Updated 23 Oct 2026</span>
+  </div>
+</header>
+
+<section aria-labelledby="status-h">
+  <h2 id="status-h">Where it stands</h2>
+  <div class="tiles">
+    <div class="tile t-green"><span class="k">SIT</span><b>Live, new version</b><span>Deploy 0Afiq0000001v97CAA · 42/42 Apex tests · Jest 9/9</span></div>
+    <div class="tile t-amber"><span class="k">Production</span><b>Old version</b><span>Agent API version since 2 Oct. New version is Naga's deploy.</span></div>
+    <div class="tile t-teal"><span class="k">Einstein in SIT</span><b>On</b><span>Turned back on 23 Oct after the sandbox refresh left it off.</span></div>
+    <div class="tile t-gray"><span class="k">Agentforce agent</span><b>Not needed</b><span>The summary calls the model directly. No agent, app or credential.</span></div>
+  </div>
+</section>
+
+<section aria-labelledby="how-h">
+  <h2 id="how-h">How it works</h2>
+  <ol class="pipe">
+    <li class="t-blue"><span class="n">1</span><b>Open the case</b><span>A case manager opens an Opportunity with the card on it.</span><span class="cost">No AI cost</span></li>
+    <li class="t-teal"><span class="n">2</span><b>History gathered</b><span>Emails, tasks, events, notes, case comments and Convoso calls, as the user (user mode).</span><span class="cost">SOQL + 1 Data 360 query</span></li>
+    <li class="t-ai"><span class="n">3</span><b>Press Generate</b><span>Nothing runs on load or on the timer. Only the button calls the AI.</span><span class="cost">Button only</span></li>
+    <li class="t-amber"><span class="n">4</span><b>Text cleaned</b><span>Every line goes through <code>neutralise()</code>. At most 60 entries and 12,000 characters.</span><span class="cost">Injection guard</span></li>
+    <li class="t-red"><span class="n">5</span><b>Model call</b><span><code>aiplatform.ModelsAPI</code>, model <code>sfdc_ai__DefaultGPT4Omni</code>, inside the org.</span><span class="cost">1 billed call</span></li>
+    <li class="t-green"><span class="n">6</span><b>Card shown</b><span>The JSON reply is parsed into the boxes. A non-JSON reply still shows as text.</span><span class="cost">Never blank</span></li>
+  </ol>
+</section>
+
+<section aria-labelledby="card-h">
+  <h2 id="card-h">What the card shows</h2>
+  <p class="lede">Built from the AIsummarycon template (static resource on SIT). Same order, top to bottom.</p>
+  <div class="cardmap" aria-label="Card layout">
+    <div class="cm t-gray span6"><b>Header</b><span>Client initials, case name in large type, View record.</span></div>
+    <div class="cm t-ai span6"><b>AI Summary</b><span>Generate AI Summary button, Last updated time, AI-generated badge.</span></div>
+    <div class="cm t-ai span4"><b>Overall Summary</b><span>Two to four sentences: where things stand and what to do next.</span></div>
+    <div class="cm t-green span2"><b>Customer Sentiment</b><span>Positive, Neutral, Negative or Unknown, with one line why.</span></div>
+    <div class="cm t-green span1-5"><b>Calls · Emails · Notes</b><span>Counted from the real history, not by the AI.</span></div>
+    <div class="cm t-red span1-5"><b>Next Key Meeting</b><span>From the summary, when the history names one.</span></div>
+    <div class="cm t-green span2"><b>Key Insights</b><span>Up to 5.</span></div>
+    <div class="cm t-red span2"><b>Customer Concerns</b><span>Up to 5.</span></div>
+    <div class="cm t-blue span2"><b>Recommended Next Actions</b><span>Up to 5, priority + due date.</span></div>
+    <div class="cm t-ai span6"><b>Ask about this case</b><span>Type a question; plain-text answer from the same history.</span></div>
+    <div class="cm t-teal span6"><b>Recent Communications</b><span>Icon per type, date and time, type tag, title, 2-line preview, search, type filter, View source (opens the record; a call opens its recording).</span></div>
+  </div>
+  <div class="grid2">
+    <div class="callout t-amber"><b>Calls have no transcript</b><span>Convoso stores when a call happened, who took it and how long it ran. The AI is told never to invent what was said on a call.</span></div>
+    <div class="callout t-gray"><b>Differences from the image</b><span>Rows show their own text, not an AI one-liner and tags (that would bill a call per row). Next actions have no tick boxes because nothing would save them.</span></div>
+  </div>
+</section>
+
+<section aria-labelledby="comp-h">
+  <h2 id="comp-h">Components</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Component</th><th>Type</th><th>What it does</th><th>SIT</th><th>Prod</th></tr></thead>
+    <tbody>
+      <tr><td><code>PreviousConversationsAgent</code></td><td>Apex</td><td>Builds the transcript, calls the Models API, parses the JSON card. Coverage 83%.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old (Agent API)</span></td></tr>
+      <tr><td><code>PreviousConversationsAgentTest</code></td><td>Apex test</td><td>16 tests, model mocked.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old</span></td></tr>
+      <tr><td><code>previousConversationsAI</code></td><td>LWC</td><td>The card. Auto-refreshes the history on fixed slots (Mon–Fri, 9:00–16:30 ET); never the AI.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old</span></td></tr>
+      <tr><td><code>PreviousConversationsService</code></td><td>Apex</td><td>Gathers the history for the whole client, user mode, newest first.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
+      <tr><td><code>PreviousConversationsController</code></td><td>Apex</td><td><code>getHistory</code> (cacheable) and <code>askAgent</code>.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
+      <tr><td><code>CaseManagerAIDigestService</code></td><td>Apex</td><td>Provides <code>neutralise()</code>, the shared prompt-injection guard.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
+      <tr><td><code>PreviousConversationsAgentAction</code></td><td>Apex</td><td>Invocable for a future Agentforce Employee Agent panel.</td><td><span class="pill t-gray">Repo only</span></td><td><span class="pill t-gray">No</span></td></tr>
+      <tr><td><code>AIsummarycon</code></td><td>Static resource</td><td>The design template image.</td><td><span class="pill t-green">Uploaded</span></td><td><span class="pill t-gray">Not needed</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section aria-labelledby="prod-h">
+  <h2 id="prod-h">Production deploy (Naga)</h2>
+  <ol class="steps">
+    <li><b>Confirm Einstein is on in Prod.</b> It is today (checked 23 Oct). Case Manager AI already uses the same Models API there.</li>
+    <li><b>Deploy only these three components.</b> Never deploy the whole classes folder from this repo: it is older than the orgs.
+      <div class="copy">
+        <div class="copy-head"><span>Command</span><button class="btn" type="button" data-copy="cmd-prod">Copy</button></div>
+        <pre id="cmd-prod">sf project deploy start -o prod -m ApexClass:PreviousConversationsAgent -m ApexClass:PreviousConversationsAgentTest -m LightningComponentBundle:previousConversationsAI -l RunSpecifiedTests -t PreviousConversationsAgentTest -t PreviousConversationsServiceTest</pre>
+      </div>
+    </li>
+    <li><b>Ask case managers to refresh their browser.</b> Open tabs keep the old card.</li>
+    <li><b>Check it.</b> Open an Opportunity with history, press Generate AI Summary, and check the boxes fill in. Ask one question in the ask box.</li>
+  </ol>
+</section>
+
+<section aria-labelledby="dec-h">
+  <h2 id="dec-h">Decisions</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Date</th><th>Decision</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap">4 Sep</td><td>The AI never runs on load or on the timer; only the history refreshes.</td><td>Every AI call is billed; a timer would bill with nobody reading.</td></tr>
+      <tr><td class="nowrap">4 Sep</td><td>Send the transcript built as the user, never a record Id.</td><td>The AI only sees what the case manager can already see.</td></tr>
+      <tr><td class="nowrap">23 Oct</td><td>No external client app or Agent API: call the Models API inside Salesforce.</td><td>Naga: "I am using this AI inside the Salesforce." Same pattern as Case Manager AI, already live.</td></tr>
+      <tr><td class="nowrap">23 Oct</td><td>Card design = the AIsummarycon template.</td><td>Naga uploaded it as the design to follow, history included.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section aria-labelledby="open-h">
+  <h2 id="open-h">Open items</h2>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Naga</h3>
+      <ul>
+        <li>Prod deploy (command above).</li>
+        <li>Try Generate on a real case in SIT. SIT has very few emails, so a busy case is the best test.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Later, if wanted</h3>
+      <ul>
+        <li>Per-row AI one-liners and tags in Recent Communications (costs a call per row).</li>
+        <li>An Agentforce side-panel version using <code>PreviousConversationsAgentAction</code>.</li>
+        <li>The inactive Service Agent "Previous Conversations AI" in Prod is not used by this card.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="log-h">
+  <h2 id="log-h">Build log</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Date</th><th>Org</th><th>What happened</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap">4 Sep 2026</td><td>SIT</td><td>Timeline, Agent API client, auto-refresh on fixed slots, Mon–Fri guard, technical review (17 findings) fixed. Deploys 0Af7z00000uwfP7CAI, uwflhCAA, uwfovCAA, uwftlCAA, uwgMnCAI, uwhQwCAI (before the SIT refresh).</td></tr>
+      <tr><td class="nowrap">1 Oct 2026</td><td>SIT</td><td>Agent Id moved to <code>Agentforce_Agent__mdt</code>. Deploys 0Af7z00000v4rg1CAA, 0Af7z00000v4rhdCAA.</td></tr>
+      <tr><td class="nowrap">1–2 Oct 2026</td><td>Prod</td><td>Service Agent "Previous Conversations AI" created (inactive). Classes and the old card deployed to Prod.</td></tr>
+      <tr><td class="nowrap">23 Oct 2026</td><td>SIT</td><td>Models API version validated: failed because Einstein generative AI was off in SIT (0Afiq0000001v13CAA). Bug found and fixed: a variable named <code>json</code> hid the JSON class.</td></tr>
+      <tr><td class="nowrap">23 Oct 2026</td><td>SIT</td><td>Naga turned Einstein on. Deployed the Models API class, its test and the AIsummarycon card: 0Afiq0000001v97CAA, 42/42 tests, coverage 83%, Jest 9/9. All related classes valid again.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>DCG · Previous Conversation Summary AI · build guide · source <code>docs/Previous_Conversation_Summary_AI_Guide.html</code></footer>
+</div>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var el = document.getElementById(btn.getAttribute('data-copy'));
+    var label = btn.textContent;
+    function selectIt() {
+      var r = document.createRange(); r.selectNodeContents(el);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'Selected: press Ctrl+C';
+      setTimeout(function () { btn.textContent = label; }, 2200);
+    }
+    try {
+      navigator.clipboard.writeText(el.textContent).then(function () {
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = label; }, 1600);
+      }, selectIt);
+    } catch (e) { selectIt(); }
+  });
+});
+</script>
