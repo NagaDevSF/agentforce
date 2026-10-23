@@ -26,33 +26,12 @@ const MINUTE_MS = 60 * 1000;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/**
- * How each kind of conversation looks in Recent Communications. The service's
- * kinds are 'Email received', 'Email sent', 'Task' / 'Task · Call', 'Calendar
- * event', 'Note', 'Case comment' and 'Call'.
- */
-const KIND_LOOK = {
-  call: { label: 'Call', icon: 'utility:call', tone: 'green' },
-  email: { label: 'Email', icon: 'utility:email', tone: 'blue' },
-  note: { label: 'Note', icon: 'utility:note', tone: 'violet' },
-  task: { label: 'Task', icon: 'utility:task', tone: 'amber' },
-  meeting: { label: 'Meeting', icon: 'utility:event', tone: 'teal' },
-  comment: { label: 'Comment', icon: 'utility:comments', tone: 'gray' }
-};
-
-/** Record Id prefixes that have a record page "View source" can open. */
-const OPENABLE_PREFIXES = ['00T', '00U', '02s', '002'];
-const FILE_PREFIX = '069';
-
 function kindGroup(kind) {
   const k = (kind || '').toLowerCase();
   if (k === 'call') return 'call';
   if (k.startsWith('email')) return 'email';
   if (k === 'note') return 'note';
-  if (k.startsWith('task')) return 'task';
-  if (k.startsWith('calendar')) return 'meeting';
-  if (k.startsWith('case comment')) return 'comment';
-  return 'task';
+  return 'other';
 }
 
 function easternNow(now) {
@@ -132,8 +111,7 @@ function shortDate(value) {
  * Layout follows the AIsummarycon template (static resource on SIT): the AI
  * Summary hero, Overall Summary + Customer Sentiment, call / email / note
  * counts with the next key meeting, Key Insights, Customer Concerns,
- * Recommended Next Actions, and Recent Communications with search and a type
- * filter.
+ * Recommended Next Actions, and the history counts.
  *
  * Nothing calls the model on load. The summary is generated only when the case
  * manager presses Generate AI Summary (each press is one billed model call);
@@ -175,9 +153,6 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
   error;
   loading = true;
 
-  question = '';
-  answer;
-  askedQuestion;
   summary;
   summaryText;
   summaryAt;
@@ -185,9 +160,6 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
   agentError;
   asking = false;
   askingSummary = false;
-
-  searchTerm = '';
-  typeFilter = 'all';
 
   refreshedOnLoad = false;
   timer;
@@ -280,9 +252,6 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
     this.loading = Boolean(this.caseId);
     this.history = undefined;
     this.error = undefined;
-    this.question = '';
-    this.searchTerm = '';
-    this.typeFilter = 'all';
     this.refreshedOnLoad = false;
     this.resetAgent();
   }
@@ -345,94 +314,6 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
       else if (g === 'note') notes += 1;
     });
     return { calls, emails, notes };
-  }
-
-  get typeOptions() {
-    return [
-      { label: 'All types', value: 'all' },
-      { label: 'Calls', value: 'call' },
-      { label: 'Emails', value: 'email' },
-      { label: 'Notes', value: 'note' },
-      { label: 'Tasks', value: 'task' },
-      { label: 'Meetings', value: 'meeting' },
-      { label: 'Case comments', value: 'comment' }
-    ];
-  }
-
-  handleSearch(event) {
-    this.searchTerm = event.target.value || '';
-  }
-
-  handleTypeFilter(event) {
-    this.typeFilter = event.detail.value;
-  }
-
-  get communications() {
-    const term = this.searchTerm.trim().toLowerCase();
-    return this.rawEntries
-      .filter((e) => this.typeFilter === 'all' || kindGroup(e.kind) === this.typeFilter)
-      .filter((e) => {
-        if (!term) return true;
-        return [e.title, e.detail, e.who, e.kind].some((v) => (v || '').toLowerCase().includes(term));
-      })
-      .map((e) => {
-        const group = kindGroup(e.kind);
-        const look = KIND_LOOK[group];
-        const key = e.key || '';
-        const isRecording = group === 'call' && Boolean(e.link);
-        const openable =
-          !isRecording && (OPENABLE_PREFIXES.some((p) => key.startsWith(p)) || key.startsWith(FILE_PREFIX));
-        return {
-          key: e.key,
-          icon: look.icon,
-          iconClass: `pc-kind-icon pc-tone-${look.tone}`,
-          pillClass: `pc-pill pc-tone-${look.tone}`,
-          kindLabel: look.label,
-          fullKind: e.kind,
-          title: e.title || look.label,
-          detail: e.detail,
-          hasDetail: Boolean(e.detail),
-          who: e.who,
-          hasWho: Boolean(e.who),
-          dateLine: [e.dayLabel, e.dateLabel].filter(Boolean).join(', '),
-          timeLabel: e.timeLabel,
-          link: e.link,
-          isRecording,
-          openable,
-          noSource: !isRecording && !openable
-        };
-      });
-  }
-
-  get hasCommunications() {
-    return this.communications.length > 0;
-  }
-
-  get communicationsEmpty() {
-    return this.hasEntries && !this.hasCommunications;
-  }
-
-  get communicationsCount() {
-    const shown = this.communications.length;
-    const total = this.rawEntries.length;
-    return shown === total ? `${total} total` : `${shown} of ${total}`;
-  }
-
-  handleOpenSource(event) {
-    const key = event.currentTarget.dataset.key;
-    if (!key) return;
-    if (key.startsWith(FILE_PREFIX)) {
-      this[NavigationMixin.Navigate]({
-        type: 'standard__namedPage',
-        attributes: { pageName: 'filePreview' },
-        state: { selectedRecordId: key }
-      });
-      return;
-    }
-    this[NavigationMixin.Navigate]({
-      type: 'standard__recordPage',
-      attributes: { recordId: key, actionName: 'view' }
-    });
   }
 
   // ── AI Summary ──────────────────────────────────────────────────────────────
@@ -542,42 +423,18 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
     return this.summary || this.summaryText ? 'Regenerate' : 'Generate AI Summary';
   }
 
-  get askLabel() {
-    return this.asking && !this.askingSummary ? 'Asking…' : 'Ask';
-  }
-
   /** Nothing to summarise, nothing configured, or a call already in flight. */
   get askDisabled() {
     return this.asking || !this.agentConfigured || !this.hasEntries;
-  }
-
-  get questionDisabled() {
-    return this.askDisabled || !this.question.trim();
   }
 
   get agentUnset() {
     return !this.agentConfigured;
   }
 
-  get hasAnswer() {
-    return Boolean(this.answer);
-  }
-
-  handleQuestion(event) {
-    this.question = event.target.value || '';
-  }
-
-  handleQuestionKey(event) {
-    if (event.key === 'Enter' && !this.questionDisabled) {
-      this.handleAsk();
-    }
-  }
-
   resetAgent() {
     // Bumping the token orphans any request still in flight.
     this.askToken += 1;
-    this.answer = undefined;
-    this.askedQuestion = undefined;
     this.summary = undefined;
     this.summaryText = undefined;
     this.summaryAt = undefined;
@@ -588,57 +445,45 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
   }
 
   handleGenerate() {
-    return this.send('');
-  }
-
-  handleAsk() {
-    return this.send(this.question.trim());
+    return this.send();
   }
 
   /**
-   * One request about the CURRENT case. A reply that comes back after the case
-   * changed is dropped (token check), so one client's summary never lands under
-   * another client's timeline.
+   * One summary request about the CURRENT case. A reply that comes back after
+   * the case changed is dropped (token check), so one client's summary never
+   * lands under another client's case.
    */
-  async send(question) {
-    if (this.askDisabled || (question === '' && this.askingSummary)) {
+  async send() {
+    if (this.askDisabled) {
       return;
     }
-    const wantsSummary = question === '';
     this.askToken += 1;
     const token = this.askToken;
     this.asking = true;
-    this.askingSummary = wantsSummary;
+    this.askingSummary = true;
     this.agentNotice = undefined;
     this.agentError = undefined;
-    if (!wantsSummary) {
-      this.answer = undefined;
-      this.askedQuestion = question;
-    }
     try {
       const res = await askAgent({
         recordId: this.caseId,
         agentId: this.agentId,
-        question
+        question: ''
       });
       if (token !== this.askToken) {
         return;
       }
       this.agentNotice = res?.notice;
-      if (wantsSummary) {
-        if (res?.summary || res?.text) {
-          this.summary = res?.summary || undefined;
-          this.summaryText = res?.summary ? undefined : res?.text;
-          this.summaryAt = new Intl.DateTimeFormat('en-US', {
+      if (res?.summary || res?.text) {
+        this.summary = res?.summary || undefined;
+        this.summaryText = res?.summary ? undefined : res?.text;
+        this.summaryAt =
+          new Intl.DateTimeFormat('en-US', {
             timeZone: ZONE,
             month: 'short',
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit'
           }).format(new Date()) + ' ET';
-        }
-      } else {
-        this.answer = res?.text;
       }
     } catch (e) {
       if (token !== this.askToken) {

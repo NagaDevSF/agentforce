@@ -5,7 +5,7 @@
       <div class="pc-avatar" aria-hidden="true">{initials}</div>
       <div class="pc-header-text">
         <h2 class="pc-name">{caseName}</h2>
-        <p class="pc-sub">Previous conversations from calls, emails, notes and tasks</p>
+        <p class="pc-sub">AI summary of calls, emails, notes and tasks</p>
       </div>
       <div class="pc-header-actions" if:true={hasCase}>
         <button type="button" class="pc-btn" onclick={handleViewRecord}>
@@ -58,6 +58,8 @@
         </div>
 
         <p if:true={agentUnset} class="pc-quiet">The AI Summary is not available in this org yet.</p>
+
+        <p if:true={isEmpty} class="pc-quiet">Nothing has been recorded on this case yet, so there is nothing to summarise.</p>
 
         <div if:true={showSummaryPrompt} class="pc-hero-empty">
           Press <b>Generate AI Summary</b> to read every call, email and note on this case and get the
@@ -114,7 +116,6 @@
           <div>
             <span class="pc-stat-num">{stats.calls}</span>
             <span class="pc-stat-label">Calls</span>
-            <span class="pc-muted">Logged calls (date, time, who and length)</span>
           </div>
         </div>
         <div class="pc-stat">
@@ -198,92 +199,8 @@
         </div>
       </section>
 
-      <!-- ── Ask a question ── -->
-      <section class="pc-ask" aria-label="Ask about this case">
-        <div class="pc-ask-row" onkeyup={handleQuestionKey}>
-          <lightning-input
-            type="text"
-            label="Ask about this case"
-            variant="label-hidden"
-            placeholder="Ask about this case, e.g. When was the last call?"
-            value={question}
-            onchange={handleQuestion}
-            class="pc-ask-input"
-          ></lightning-input>
-          <button type="button" class="pc-btn" disabled={questionDisabled} onclick={handleAsk}>{askLabel}</button>
-        </div>
-        <div if:true={hasAnswer} class="pc-answer" aria-live="polite">
-          <span class="pc-small-label">{askedQuestion}</span>
-          <p>{answer}</p>
-        </div>
-      </section>
-
       <p if:true={notice} class="pc-notice">{notice}</p>
 
-      <!-- ── Recent Communications ── -->
-      <section class="pc-comms" aria-labelledby="pc-comms-title">
-        <div class="pc-comms-head">
-          <span class="pc-round-icon pc-tone-violet" aria-hidden="true">
-            <lightning-icon icon-name="utility:comments" size="small" alternative-text=""></lightning-icon>
-          </span>
-          <div class="pc-comms-title-wrap">
-            <h3 id="pc-comms-title" class="pc-comms-title">Recent Communications</h3>
-            <span class="pc-muted">Combined view of calls, emails, notes and tasks · {communicationsCount}</span>
-          </div>
-          <div class="pc-comms-tools">
-            <lightning-input
-              type="search"
-              label="Search communications"
-              variant="label-hidden"
-              placeholder="Search communications…"
-              value={searchTerm}
-              onchange={handleSearch}
-              class="pc-search"
-            ></lightning-input>
-            <lightning-combobox
-              label="Type"
-              variant="label-hidden"
-              value={typeFilter}
-              options={typeOptions}
-              onchange={handleTypeFilter}
-              class="pc-type"
-            ></lightning-combobox>
-          </div>
-        </div>
-
-        <p if:true={isEmpty} class="pc-quiet">Nothing has been recorded on this case yet.</p>
-        <p if:true={communicationsEmpty} class="pc-quiet">No communications match this search.</p>
-
-        <ul if:true={hasCommunications} class="pc-comm-list">
-          <template for:each={communications} for:item="c">
-            <li key={c.key} class="pc-comm">
-              <span class={c.iconClass} aria-hidden="true">
-                <lightning-icon icon-name={c.icon} size="x-small" alternative-text=""></lightning-icon>
-              </span>
-              <div class="pc-comm-when">
-                <span class="pc-comm-date">{c.dateLine}</span>
-                <span class="pc-muted">{c.timeLabel}</span>
-              </div>
-              <span class={c.pillClass} title={c.fullKind}>{c.kindLabel}</span>
-              <div class="pc-comm-main">
-                <span class="pc-comm-title">{c.title}</span>
-                <p if:true={c.hasDetail} class="pc-comm-detail">{c.detail}</p>
-                <span if:true={c.hasWho} class="pc-muted">{c.who}</span>
-              </div>
-              <div class="pc-comm-source">
-                <a if:true={c.isRecording} href={c.link} target="_blank" rel="noopener noreferrer" class="pc-link">
-                  Recording
-                  <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text="opens in a new tab"></lightning-icon>
-                </a>
-                <button if:true={c.openable} type="button" class="pc-link-btn" data-key={c.key} onclick={handleOpenSource}>
-                  View source
-                  <lightning-icon icon-name="utility:new_window" size="xx-small" alternative-text=""></lightning-icon>
-                </button>
-              </div>
-            </li>
-          </template>
-        </ul>
-      </section>
     </template>
   </article>
 </template>

@@ -128,9 +128,10 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
 <header class="top">
   <span class="eyebrow">DCG · Case Managers · Build guide</span>
   <h1>Previous Conversation Summary AI</h1>
-  <p class="lede">One card on the Opportunity that lists everything already said to a client (emails, tasks, meetings, notes, case comments and calls) and, at the press of a button, writes an AI Summary of it: overall summary, sentiment, key insights, concerns, next actions and the next meeting.</p>
+  <p class="lede">One card on the Opportunity that reads everything already said to a client (emails, tasks, meetings, notes, case comments and calls) and, at the press of a button, writes an AI Summary of it: overall summary, customer sentiment, key insights, concerns, next actions and the next meeting.</p>
   <div class="links">
     <a href="https://app.asana.com/1/1207860012563297/project/1211080260491726/task/1217958144750201" target="_blank" rel="noopener">Asana task</a>
+    <a href="https://github.com/NagaDevSF/agentforce/commit/0d22629" target="_blank" rel="noopener">GitHub commit 0d22629</a>
     <span>Updated 23 Oct 2026</span>
   </div>
 </header>
@@ -138,7 +139,7 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
 <section aria-labelledby="status-h">
   <h2 id="status-h">Where it stands</h2>
   <div class="tiles">
-    <div class="tile t-green"><span class="k">SIT</span><b>Live, new version</b><span>Deploy 0Afiq0000001v97CAA · 42/42 Apex tests · Jest 9/9</span></div>
+    <div class="tile t-green"><span class="k">SIT</span><b>Live, new version</b><span>Card 0Afiq0000001vFZCAY · Apex 0Afiq0000001v97CAA (42/42) · Jest 12/12</span></div>
     <div class="tile t-amber"><span class="k">Production</span><b>Old version</b><span>Agent API version since 2 Oct. New version is Naga's deploy.</span></div>
     <div class="tile t-teal"><span class="k">Einstein in SIT</span><b>On</b><span>Turned back on 23 Oct after the sandbox refresh left it off.</span></div>
     <div class="tile t-gray"><span class="k">Agentforce agent</span><b>Not needed</b><span>The summary calls the model directly. No agent, app or credential.</span></div>
@@ -165,18 +166,32 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
     <div class="cm t-ai span6"><b>AI Summary</b><span>Generate AI Summary button, Last updated time, AI-generated badge.</span></div>
     <div class="cm t-ai span4"><b>Overall Summary</b><span>Two to four sentences: where things stand and what to do next.</span></div>
     <div class="cm t-green span2"><b>Customer Sentiment</b><span>Positive, Neutral, Negative or Unknown, with one line why.</span></div>
-    <div class="cm t-green span1-5"><b>Calls · Emails · Notes</b><span>Counted from the real history, not by the AI.</span></div>
+    <div class="cm t-green span1-5"><b>Calls · Emails · Notes</b><span>Counts only, from the real history, not by the AI.</span></div>
     <div class="cm t-red span1-5"><b>Next Key Meeting</b><span>From the summary, when the history names one.</span></div>
     <div class="cm t-green span2"><b>Key Insights</b><span>Up to 5.</span></div>
     <div class="cm t-red span2"><b>Customer Concerns</b><span>Up to 5.</span></div>
     <div class="cm t-blue span2"><b>Recommended Next Actions</b><span>Up to 5, priority + due date.</span></div>
-    <div class="cm t-ai span6"><b>Ask about this case</b><span>Type a question; plain-text answer from the same history.</span></div>
-    <div class="cm t-teal span6"><b>Recent Communications</b><span>Icon per type, date and time, type tag, title, 2-line preview, search, type filter, View source (opens the record; a call opens its recording).</span></div>
   </div>
+  <p class="lede">Removed on 23 Oct at Naga's request: the Recent Communications list, the ask box, and the line under the Calls count. The history is still read in the background for the counts and the summary.</p>
   <div class="grid2">
     <div class="callout t-amber"><b>Calls have no transcript</b><span>Convoso stores when a call happened, who took it and how long it ran. The AI is told never to invent what was said on a call.</span></div>
-    <div class="callout t-gray"><b>Differences from the image</b><span>Rows show their own text, not an AI one-liner and tags (that would bill a call per row). Next actions have no tick boxes because nothing would save them.</span></div>
+    <div class="callout t-gray"><b>Differences from the image</b><span>No Recent Communications list or ask box. Next actions have no tick boxes because nothing would save them.</span></div>
   </div>
+</section>
+
+<section aria-labelledby="sent-h">
+  <h2 id="sent-h">Customer Sentiment</h2>
+  <p class="lede">One label for the whole client, judged only from what the client wrote and how the team described the client. Calls are not judged, because they have no transcript. The label comes with one short sentence saying why.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Label</th><th>Color</th><th>When the AI picks it</th><th>Example the card would show</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill t-green">Positive</span></td><td>Green, thumbs-up</td><td>The client is thankful, cooperative or happy with progress.</td><td>"Client thanked the team after the Capital One settlement and sent the documents the same day."</td></tr>
+      <tr><td><span class="pill t-blue">Neutral</span></td><td>Blue, info icon</td><td>Routine questions and updates, no strong feeling either way.</td><td>"Client asked when the next draft clears and confirmed the bank details."</td></tr>
+      <tr><td><span class="pill t-red">Negative</span></td><td>Red, thumbs-down</td><td>Complaints, frustration, worry, talk of cancelling or disputing.</td><td>"Client is worried about a medical bill and asked to skip the October payment."</td></tr>
+      <tr><td><span class="pill t-gray">Unknown</span></td><td>Gray, info icon</td><td>Not enough client wording to judge, for example only call logs and internal notes, or the AI left it out.</td><td>"Only call logs and internal tasks on this case; nothing the client wrote."</td></tr>
+    </tbody>
+  </table></div>
+  <p class="lede">These examples are illustrations, not real clients. The label is a reading aid for the case manager, not a score: always read the summary and the case before acting on it.</p>
 </section>
 
 <section aria-labelledby="comp-h">
@@ -186,7 +201,7 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
     <tbody>
       <tr><td><code>PreviousConversationsAgent</code></td><td>Apex</td><td>Builds the transcript, calls the Models API, parses the JSON card. Coverage 83%.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old (Agent API)</span></td></tr>
       <tr><td><code>PreviousConversationsAgentTest</code></td><td>Apex test</td><td>16 tests, model mocked.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old</span></td></tr>
-      <tr><td><code>previousConversationsAI</code></td><td>LWC</td><td>The card. Auto-refreshes the history on fixed slots (Mon–Fri, 9:00–16:30 ET); never the AI.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old</span></td></tr>
+      <tr><td><code>previousConversationsAI</code></td><td>LWC</td><td>The card: header, AI Summary, counts, insights, concerns, next actions. Refreshes the counts on fixed slots (Mon–Fri, 9:00–16:30 ET); never the AI.</td><td><span class="pill t-green">New · 23 Oct</span></td><td><span class="pill t-amber">Old</span></td></tr>
       <tr><td><code>PreviousConversationsService</code></td><td>Apex</td><td>Gathers the history for the whole client, user mode, newest first.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
       <tr><td><code>PreviousConversationsController</code></td><td>Apex</td><td><code>getHistory</code> (cacheable) and <code>askAgent</code>.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
       <tr><td><code>CaseManagerAIDigestService</code></td><td>Apex</td><td>Provides <code>neutralise()</code>, the shared prompt-injection guard.</td><td><span class="pill t-gray">Unchanged</span></td><td><span class="pill t-gray">Same</span></td></tr>
@@ -207,7 +222,7 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
       </div>
     </li>
     <li><b>Ask case managers to refresh their browser.</b> Open tabs keep the old card.</li>
-    <li><b>Check it.</b> Open an Opportunity with history, press Generate AI Summary, and check the boxes fill in. Ask one question in the ask box.</li>
+    <li><b>Check it.</b> Open an Opportunity with history, press Generate AI Summary, and check the boxes fill in and the sentiment shows its color.</li>
   </ol>
 </section>
 
@@ -237,7 +252,6 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
     <div class="panel">
       <h3>Later, if wanted</h3>
       <ul>
-        <li>Per-row AI one-liners and tags in Recent Communications (costs a call per row).</li>
         <li>An Agentforce side-panel version using <code>PreviousConversationsAgentAction</code>.</li>
         <li>The inactive Service Agent "Previous Conversations AI" in Prod is not used by this card.</li>
       </ul>
@@ -255,6 +269,8 @@ footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--li
       <tr><td class="nowrap">1–2 Oct 2026</td><td>Prod</td><td>Service Agent "Previous Conversations AI" created (inactive). Classes and the old card deployed to Prod.</td></tr>
       <tr><td class="nowrap">23 Oct 2026</td><td>SIT</td><td>Models API version validated: failed because Einstein generative AI was off in SIT (0Afiq0000001v13CAA). Bug found and fixed: a variable named <code>json</code> hid the JSON class.</td></tr>
       <tr><td class="nowrap">23 Oct 2026</td><td>SIT</td><td>Naga turned Einstein on. Deployed the Models API class, its test and the AIsummarycon card: 0Afiq0000001v97CAA, 42/42 tests, coverage 83%, Jest 9/9. All related classes valid again.</td></tr>
+      <tr><td class="nowrap">23 Oct 2026</td><td>GitHub</td><td>Pushed to <code>NagaDevSF/agentforce</code> (public), commit 0d22629: the Agent class and test, the card with its Jest test, PreviousConversationsAgentAction and this guide. The Service, Controller and DigestService it depends on are in the org but not yet in the repo.</td></tr>
+      <tr><td class="nowrap">23 Oct 2026</td><td>SIT</td><td>Naga asked to remove the Recent Communications list, the ask box and the line under the Calls count. Card redeployed: 0Afiq0000001vFZCAY. Jest 12/12, including a color check for each sentiment. Sentiment colors and examples added to this guide. Not yet pushed to GitHub.</td></tr>
     </tbody>
   </table></div>
 </section>

@@ -43,10 +43,10 @@ const HISTORY = {
   callCount: 1,
   notice: null,
   entries: [
-    { key: 'call-convoso-1', kind: 'Call', dayLabel: 'Tuesday', dateLabel: 'Oct 21', timeLabel: '2:14 PM ET', title: 'Outbound', who: 'Case Manager', link: 'https://rec.example.com/1' },
-    { key: '02s000000000001AAA', kind: 'Email received', dayLabel: 'Monday', dateLabel: 'Oct 20', timeLabel: '9:40 AM ET', title: 'Creditor letter', detail: 'Attached the letter.', who: 'Dana' },
-    { key: '069000000000001AAA', kind: 'Note', dayLabel: 'Sunday', dateLabel: 'Oct 19', timeLabel: '4:02 PM ET', title: 'Spoke to client', detail: 'Wants to pause one payment.' },
-    { key: '00a000000000001AAA', kind: 'Case comment', dayLabel: 'Saturday', dateLabel: 'Oct 18', timeLabel: '1:00 PM ET', title: 'Comment', detail: 'Checked plan.' }
+    { key: 'call-convoso-1', kind: 'Call', dayLabel: 'Tuesday', dateLabel: 'Oct 21', timeLabel: '2:14 PM ET', title: 'Outbound', who: 'Case Manager' },
+    { key: '02s000000000001AAA', kind: 'Email received', dayLabel: 'Monday', dateLabel: 'Oct 20', timeLabel: '9:40 AM ET', title: 'Creditor letter' },
+    { key: '069000000000001AAA', kind: 'Note', dayLabel: 'Sunday', dateLabel: 'Oct 19', timeLabel: '4:02 PM ET', title: 'Spoke to client' },
+    { key: '00T000000000001AAA', kind: 'Task', dayLabel: 'Sunday', dateLabel: 'Oct 19', timeLabel: '3:00 PM ET', title: 'Follow up' }
   ]
 };
 
@@ -60,17 +60,24 @@ const CARD = {
   nextKeyMeeting: { title: 'Review call', meetingDate: '2026-11-05', meetingTime: '10:00 AM' }
 };
 
-function mount() {
+function mount(history = HISTORY) {
   const el = createElement('c-previous-conversations-ai', { is: PreviousConversationsAI });
   el.recordId = '006000000000001AAA';
   document.body.appendChild(el);
-  getHistory.emit(HISTORY);
+  getHistory.emit(history);
   return el;
 }
 
 const text = (el) => el.shadowRoot.textContent;
-const buttonByText = (el, label) =>
-  Array.from(el.shadowRoot.querySelectorAll('button')).find((b) => b.textContent.trim().startsWith(label));
+const generate = (el) =>
+  Array.from(el.shadowRoot.querySelectorAll('button')).find((b) => /Generate|Regenerate/.test(b.textContent));
+
+async function generateWith(el, reply) {
+  askAgent.mockResolvedValue(reply);
+  generate(el).click();
+  await flush();
+  await flush();
+}
 
 describe('c-previous-conversations-ai', () => {
   afterEach(() => {
@@ -78,66 +85,32 @@ describe('c-previous-conversations-ai', () => {
     jest.clearAllMocks();
   });
 
-  it('shows the client name, counts and every communication without calling the AI', async () => {
+  it('shows the client name and the counts without calling the AI', async () => {
     const el = mount();
     await flush();
     expect(el.shadowRoot.querySelector('.pc-name').textContent).toBe('Blue Ridge Freight');
     expect(el.shadowRoot.querySelector('.pc-avatar').textContent).toBe('BR');
     const nums = Array.from(el.shadowRoot.querySelectorAll('.pc-stat-num')).map((n) => n.textContent);
     expect(nums).toEqual(['1', '1', '1']);
-    expect(el.shadowRoot.querySelectorAll('.pc-comm')).toHaveLength(4);
     expect(text(el)).toContain('Generate AI Summary');
     expect(askAgent).not.toHaveBeenCalled();
   });
 
-  it('gives a call its recording link, records a View source button, and a case comment no link', async () => {
+  it('has no conversation list, no ask box and no line under the call count', async () => {
     const el = mount();
     await flush();
-    const rows = el.shadowRoot.querySelectorAll('.pc-comm');
-    expect(rows[0].querySelector('a.pc-link').href).toBe('https://rec.example.com/1');
-    expect(rows[1].querySelector('.pc-link-btn').dataset.key).toBe('02s000000000001AAA');
-    expect(rows[3].querySelector('.pc-link-btn')).toBeNull();
-    expect(rows[3].querySelector('a.pc-link')).toBeNull();
-  });
-
-  it('opens the email record from View source', async () => {
-    const el = mount();
-    await flush();
-    el.shadowRoot.querySelectorAll('.pc-comm')[1].querySelector('.pc-link-btn').click();
-    const pageReference = mockNavigate.mock.calls[0][0];
-    expect(pageReference.type).toBe('standard__recordPage');
-    expect(pageReference.attributes.recordId).toBe('02s000000000001AAA');
-  });
-
-  it('filters by type and by search text', async () => {
-    const el = mount();
-    await flush();
-    const combo = el.shadowRoot.querySelector('lightning-combobox');
-    combo.dispatchEvent(new CustomEvent('change', { detail: { value: 'email' } }));
-    await flush();
-    expect(el.shadowRoot.querySelectorAll('.pc-comm')).toHaveLength(1);
-
-    combo.dispatchEvent(new CustomEvent('change', { detail: { value: 'all' } }));
-    const search = el.shadowRoot.querySelector('lightning-input.pc-search');
-    search.value = 'pause';
-    search.dispatchEvent(new CustomEvent('change'));
-    await flush();
-    const rows = el.shadowRoot.querySelectorAll('.pc-comm');
-    expect(rows).toHaveLength(1);
-    expect(rows[0].textContent).toContain('Spoke to client');
+    expect(text(el)).not.toContain('Recent Communications');
+    expect(el.shadowRoot.querySelector('lightning-input')).toBeNull();
+    expect(el.shadowRoot.querySelector('lightning-combobox')).toBeNull();
+    expect(text(el)).not.toContain('Logged calls');
   });
 
   it('renders the AI Summary card after Generate', async () => {
-    askAgent.mockResolvedValue({ summary: CARD, configured: true });
     const el = mount();
     await flush();
-    buttonByText(el, 'Generate AI Summary').click();
-    await flush();
-    await flush();
+    await generateWith(el, { summary: CARD, configured: true });
     expect(askAgent).toHaveBeenCalledWith({ recordId: '006000000000001AAA', agentId: 'xxxxxx', question: '' });
     expect(el.shadowRoot.querySelector('.pc-overall-text').textContent).toBe(CARD.overallSummary);
-    expect(el.shadowRoot.querySelector('.pc-sentiment-label').textContent).toBe('Negative');
-    expect(el.shadowRoot.querySelector('.pc-sentiment-label').className).toContain('pc-text-red');
     expect(text(el)).toContain('Client called twice this week');
     expect(text(el)).toContain('Can they skip October?');
     expect(text(el)).toContain('High priority');
@@ -147,30 +120,26 @@ describe('c-previous-conversations-ai', () => {
     expect(text(el)).toContain('Regenerate');
   });
 
-  it('shows the raw reply as the overall summary when the card could not be parsed', async () => {
-    askAgent.mockResolvedValue({ text: 'The client is waiting on a date.' });
+  it.each([
+    ['Positive', 'pc-text-green', 'pc-tone-green'],
+    ['Neutral', 'pc-text-blue', 'pc-tone-blue'],
+    ['Negative', 'pc-text-red', 'pc-tone-red'],
+    ['Unknown', 'pc-text-gray', 'pc-tone-gray']
+  ])('colors %s sentiment', async (label, textClass, iconClass) => {
     const el = mount();
     await flush();
-    buttonByText(el, 'Generate AI Summary').click();
-    await flush();
-    await flush();
-    expect(el.shadowRoot.querySelector('.pc-overall-text').textContent).toBe('The client is waiting on a date.');
+    await generateWith(el, { summary: { ...CARD, sentimentLabel: label } });
+    const shown = el.shadowRoot.querySelector('.pc-sentiment-label');
+    expect(shown.textContent).toBe(label);
+    expect(shown.className).toContain(textClass);
+    expect(el.shadowRoot.querySelector('.pc-sentiment .pc-round-icon').className).toContain(iconClass);
   });
 
-  it('answers a typed question under the ask box', async () => {
-    askAgent.mockResolvedValue({ text: 'The last call was on Oct 21.' });
+  it('shows the raw reply as the overall summary when the card could not be parsed', async () => {
     const el = mount();
     await flush();
-    const input = el.shadowRoot.querySelector('lightning-input.pc-ask-input');
-    input.value = 'When was the last call?';
-    input.dispatchEvent(new CustomEvent('change'));
-    await flush();
-    buttonByText(el, 'Ask').click();
-    await flush();
-    await flush();
-    expect(askAgent).toHaveBeenCalledWith(expect.objectContaining({ question: 'When was the last call?' }));
-    expect(el.shadowRoot.querySelector('.pc-answer').textContent).toContain('The last call was on Oct 21.');
-    expect(el.shadowRoot.querySelector('.pc-overall-text')).toBeNull();
+    await generateWith(el, { text: 'The client is waiting on a date.' });
+    expect(el.shadowRoot.querySelector('.pc-overall-text').textContent).toBe('The client is waiting on a date.');
   });
 
   it('drops a reply that arrives after the case changed', async () => {
@@ -178,7 +147,7 @@ describe('c-previous-conversations-ai', () => {
     askAgent.mockImplementation(() => new Promise((r) => { resolve = r; }));
     const el = mount();
     await flush();
-    buttonByText(el, 'Generate AI Summary').click();
+    generate(el).click();
     el.recordId = '006000000000002AAA';
     getHistory.emit({ ...HISTORY, caseName: 'Other Client' });
     resolve({ summary: CARD });
@@ -188,13 +157,24 @@ describe('c-previous-conversations-ai', () => {
     expect(el.shadowRoot.querySelector('.pc-name').textContent).toBe('Other Client');
   });
 
+  it('says so and disables Generate when the case has no history', async () => {
+    const el = mount({ ...HISTORY, entries: [] });
+    await flush();
+    expect(text(el)).toContain('Nothing has been recorded on this case yet');
+    expect(generate(el).disabled).toBe(true);
+  });
+
   it('shows the notice when the AI is unavailable', async () => {
-    askAgent.mockResolvedValue({ notice: 'The AI is unavailable right now.' });
     const el = mount();
     await flush();
-    buttonByText(el, 'Generate AI Summary').click();
-    await flush();
-    await flush();
+    await generateWith(el, { notice: 'The AI is unavailable right now.' });
     expect(el.shadowRoot.querySelector('.pc-notice').textContent).toContain('unavailable');
+  });
+
+  it('opens the Opportunity from View record', async () => {
+    const el = mount();
+    await flush();
+    Array.from(el.shadowRoot.querySelectorAll('button')).find((b) => b.textContent.includes('View record')).click();
+    expect(mockNavigate.mock.calls[0][0].attributes.recordId).toBe('006000000000001AAA');
   });
 });

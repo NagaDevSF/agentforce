@@ -1,5 +1,5 @@
-/* Layout follows the AIsummarycon template: AI hero, counts, three colored
-   columns, then Recent Communications. Colors live in tokens on :host. */
+/* Layout follows the AIsummarycon template: AI hero, counts, then three
+   colored columns. Colors live in tokens on :host. */
 :host {
   --pc-ink: #14213a;
   --pc-ink-2: #46536a;
@@ -108,9 +108,7 @@
   background: #5b21b6;
   color: #ffffff;
 }
-.pc-btn:focus-visible,
-.pc-link-btn:focus-visible,
-.pc-link:focus-visible {
+.pc-btn:focus-visible {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
 }
@@ -342,156 +340,6 @@
   color: var(--pc-ink-2);
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
-}
-
-/* ── Ask ── */
-.pc-ask {
-  background: var(--pc-surface);
-  border: 1px solid var(--pc-line);
-  border-radius: 0.875rem;
-  padding: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-.pc-ask-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-.pc-ask-input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.pc-answer {
-  background: var(--pc-violet-bg);
-  border-radius: 0.75rem;
-  padding: 0.75rem 0.875rem;
-}
-.pc-answer p {
-  margin: 0.25rem 0 0;
-  line-height: 1.5;
-}
-
-/* ── Recent Communications ── */
-.pc-comms {
-  background: var(--pc-surface);
-  border: 1px solid var(--pc-line);
-  border-radius: 1rem;
-  padding: 0.875rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.pc-comms-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  padding-bottom: 0.5rem;
-}
-.pc-comms-title-wrap {
-  flex: 1 1 14rem;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.pc-comms-title {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 800;
-}
-.pc-comms-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-.pc-search {
-  width: 15rem;
-  max-width: 100%;
-}
-.pc-type {
-  width: 10rem;
-}
-.pc-comm-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.pc-comm {
-  display: grid;
-  grid-template-columns: 2.25rem 6.5rem 5.5rem minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: start;
-  padding: 0.75rem 0.25rem;
-  border-top: 1px solid var(--pc-line);
-}
-@media (max-width: 48rem) {
-  .pc-comm {
-    grid-template-columns: 2.25rem minmax(0, 1fr);
-  }
-  .pc-comm > :nth-child(n + 3) {
-    grid-column: 2;
-  }
-}
-.pc-kind-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-.pc-comm-when {
-  display: flex;
-  flex-direction: column;
-  font-variant-numeric: tabular-nums;
-}
-.pc-comm-date {
-  font-weight: 600;
-}
-.pc-comm-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-.pc-comm-title {
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-.pc-comm-detail {
-  margin: 0;
-  color: var(--pc-ink-2);
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.pc-comm-source {
-  display: flex;
-  align-items: center;
-}
-.pc-link,
-.pc-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--pc-blue);
-  font-weight: 600;
-  background: none;
-  border: 0;
-  padding: 0.25rem 0;
-  cursor: pointer;
-  white-space: nowrap;
-  font-size: 0.8125rem;
-  text-decoration: none;
-}
-.pc-link:hover,
-.pc-link-btn:hover {
-  text-decoration: underline;
 }
 
 /* ── Shared pieces ── */
