@@ -23,19 +23,6 @@ jest.mock('@salesforce/apex/PreviousConversationsController.askAgent', () => ({ 
   virtual: true
 });
 
-const mockNavigate = jest.fn();
-jest.mock('lightning/navigation', () => {
-  const Navigate = Symbol('Navigate');
-  const NavigationMixin = (Base) =>
-    class extends Base {
-      [Navigate](pageReference) {
-        mockNavigate(pageReference);
-      }
-    };
-  NavigationMixin.Navigate = Navigate;
-  return { NavigationMixin };
-});
-
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const HISTORY = {
@@ -85,20 +72,21 @@ describe('c-previous-conversations-ai', () => {
     jest.clearAllMocks();
   });
 
-  it('shows the client name and the counts without calling the AI', async () => {
+  it('shows the counts without calling the AI', async () => {
     const el = mount();
     await flush();
-    expect(el.shadowRoot.querySelector('.pc-name').textContent).toBe('Blue Ridge Freight');
-    expect(el.shadowRoot.querySelector('.pc-avatar').textContent).toBe('BR');
     const nums = Array.from(el.shadowRoot.querySelectorAll('.pc-stat-num')).map((n) => n.textContent);
     expect(nums).toEqual(['1', '1', '1']);
     expect(text(el)).toContain('Generate AI Summary');
     expect(askAgent).not.toHaveBeenCalled();
   });
 
-  it('has no conversation list, no ask box and no line under the call count', async () => {
+  it('has no header, no conversation list, no ask box and no line under the call count', async () => {
     const el = mount();
     await flush();
+    expect(el.shadowRoot.querySelector('header')).toBeNull();
+    expect(text(el)).not.toContain('Blue Ridge Freight');
+    expect(text(el)).not.toContain('View record');
     expect(text(el)).not.toContain('Recent Communications');
     expect(el.shadowRoot.querySelector('lightning-input')).toBeNull();
     expect(el.shadowRoot.querySelector('lightning-combobox')).toBeNull();
@@ -154,7 +142,7 @@ describe('c-previous-conversations-ai', () => {
     await flush();
     await flush();
     expect(el.shadowRoot.querySelector('.pc-overall-text')).toBeNull();
-    expect(el.shadowRoot.querySelector('.pc-name').textContent).toBe('Other Client');
+    expect(generate(el).textContent).toContain('Generate AI Summary');
   });
 
   it('says so and disables Generate when the case has no history', async () => {
@@ -169,12 +157,5 @@ describe('c-previous-conversations-ai', () => {
     await flush();
     await generateWith(el, { notice: 'The AI is unavailable right now.' });
     expect(el.shadowRoot.querySelector('.pc-notice').textContent).toContain('unavailable');
-  });
-
-  it('opens the Opportunity from View record', async () => {
-    const el = mount();
-    await flush();
-    Array.from(el.shadowRoot.querySelectorAll('button')).find((b) => b.textContent.includes('View record')).click();
-    expect(mockNavigate.mock.calls[0][0].attributes.recordId).toBe('006000000000001AAA');
   });
 });

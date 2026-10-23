@@ -36,45 +36,6 @@
   gap: 0.875rem;
 }
 
-/* ── Header ── */
-.pc-header {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  flex-wrap: wrap;
-}
-.pc-avatar {
-  flex: 0 0 3.25rem;
-  height: 3.25rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  color: #ffffff;
-  display: grid;
-  place-items: center;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-.pc-header-text {
-  flex: 1 1 14rem;
-  min-width: 0;
-}
-.pc-name {
-  margin: 0;
-  font-size: 1.625rem;
-  line-height: 1.15;
-  font-weight: 800;
-  color: var(--pc-ink);
-  overflow-wrap: anywhere;
-}
-.pc-sub {
-  margin: 0.125rem 0 0;
-  color: var(--pc-ink-3);
-}
-.pc-header-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
 /* ── Buttons ── */
 .pc-btn {
   display: inline-flex;

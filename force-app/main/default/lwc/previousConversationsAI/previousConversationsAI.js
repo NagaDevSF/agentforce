@@ -1,5 +1,4 @@
 import { LightningElement, api, wire } from 'lwc';
-import { NavigationMixin } from 'lightning/navigation';
 import { refreshApex } from '@salesforce/apex';
 import getHistory from '@salesforce/apex/PreviousConversationsController.getHistory';
 import askAgent from '@salesforce/apex/PreviousConversationsController.askAgent';
@@ -117,7 +116,7 @@ function shortDate(value) {
  * manager presses Generate AI Summary (each press is one billed model call);
  * the timeline itself is SOQL plus one Data 360 query.
  */
-export default class PreviousConversationsAI extends NavigationMixin(LightningElement) {
+export default class PreviousConversationsAI extends LightningElement {
   _recordId;
 
   @api
@@ -256,17 +255,7 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
     this.resetAgent();
   }
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-
-  get caseName() {
-    return this.history?.caseName || this.cardTitle;
-  }
-
-  get initials() {
-    const words = (this.history?.caseName || '').split(/\s+/).filter((w) => /^[A-Za-z]/.test(w));
-    const letters = words.slice(0, 2).map((w) => w[0].toUpperCase()).join('');
-    return letters || 'PC';
-  }
+  // ── Case ────────────────────────────────────────────────────────────────────
 
   get needsCase() {
     return !this.caseId;
@@ -274,14 +263,6 @@ export default class PreviousConversationsAI extends NavigationMixin(LightningEl
 
   get hasCase() {
     return Boolean(this.caseId);
-  }
-
-  handleViewRecord() {
-    if (!this.caseId) return;
-    this[NavigationMixin.Navigate]({
-      type: 'standard__recordPage',
-      attributes: { recordId: this.caseId, objectApiName: 'Opportunity', actionName: 'view' }
-    });
   }
 
   // ── Timeline ────────────────────────────────────────────────────────────────
