@@ -47,8 +47,7 @@
         <p if:true={isEmpty} class="pc-quiet">Nothing has been recorded on this case yet, so there is nothing to summarise.</p>
 
         <div if:true={showSummaryPrompt} class="pc-hero-empty">
-          Press <b>Generate AI Summary</b> to read every call, email and note on this case and get the
-          summary, sentiment, concerns and next actions. Nothing is generated until you press it.
+          The AI Summary builds itself when the case opens. Press <b>Regenerate</b> any time for a fresh one.
         </div>
 
         <div if:true={askingSummary} class="pc-loading">

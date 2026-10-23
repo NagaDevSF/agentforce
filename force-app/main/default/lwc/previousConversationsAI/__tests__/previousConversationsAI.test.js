@@ -70,15 +70,43 @@ describe('c-previous-conversations-ai', () => {
   afterEach(() => {
     while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
     jest.clearAllMocks();
+    // A test may leave a never-resolving reply behind; the next one must start clean.
+    askAgent.mockReset();
   });
 
-  it('shows the counts without calling the AI', async () => {
+  it('builds the summary by itself once the history loads, like Case Manager AI', async () => {
+    askAgent.mockResolvedValue({ summary: CARD });
     const el = mount();
     await flush();
+    await flush();
+    expect(askAgent).toHaveBeenCalledTimes(1);
+    expect(askAgent).toHaveBeenCalledWith({ recordId: '006000000000001AAA', agentId: 'xxxxxx', question: '' });
+    expect(el.shadowRoot.querySelector('.pc-overall-text').textContent).toBe(CARD.overallSummary);
     const nums = Array.from(el.shadowRoot.querySelectorAll('.pc-stat-num')).map((n) => n.textContent);
     expect(nums).toEqual(['1', '1', '1']);
-    expect(text(el)).toContain('Generate AI Summary');
-    expect(askAgent).not.toHaveBeenCalled();
+    expect(text(el)).toContain('Regenerate');
+  });
+
+  it('does not build it again when the history refreshes (slot or forced refresh)', async () => {
+    askAgent.mockResolvedValue({ summary: CARD });
+    const el = mount();
+    await flush();
+    getHistory.emit({ ...HISTORY });
+    getHistory.emit({ ...HISTORY });
+    await flush();
+    expect(askAgent).toHaveBeenCalledTimes(1);
+    expect(el.shadowRoot.querySelector('.pc-overall-text')).not.toBeNull();
+  });
+
+  it('builds it again for the next case', async () => {
+    askAgent.mockResolvedValue({ summary: CARD });
+    const el = mount();
+    await flush();
+    el.recordId = '006000000000002AAA';
+    getHistory.emit({ ...HISTORY, caseName: 'Other Client' });
+    await flush();
+    expect(askAgent).toHaveBeenCalledTimes(2);
+    expect(askAgent.mock.calls[1][0].recordId).toBe('006000000000002AAA');
   });
 
   it('has no header, no conversation list, no ask box and no line under the call count', async () => {
@@ -134,18 +162,20 @@ describe('c-previous-conversations-ai', () => {
   });
 
   it('drops a reply that arrives after the case changed', async () => {
-    let resolve;
-    askAgent.mockImplementation(() => new Promise((r) => { resolve = r; }));
+    const resolvers = [];
+    askAgent.mockImplementation(() => new Promise((r) => { resolvers.push(r); }));
     const el = mount();
     await flush();
-    generate(el).click();
     el.recordId = '006000000000002AAA';
     getHistory.emit({ ...HISTORY, caseName: 'Other Client' });
-    resolve({ summary: CARD });
     await flush();
+    resolvers[0]({ summary: { ...CARD, overallSummary: 'OLD CLIENT' } });
     await flush();
     expect(el.shadowRoot.querySelector('.pc-overall-text')).toBeNull();
-    expect(generate(el).textContent).toContain('Generate AI Summary');
+    resolvers[1]({ summary: { ...CARD, overallSummary: 'NEW CLIENT' } });
+    await flush();
+    await flush();
+    expect(el.shadowRoot.querySelector('.pc-overall-text').textContent).toBe('NEW CLIENT');
   });
 
   it('says so and disables Generate when the case has no history', async () => {
@@ -153,6 +183,7 @@ describe('c-previous-conversations-ai', () => {
     await flush();
     expect(text(el)).toContain('Nothing has been recorded on this case yet');
     expect(generate(el).disabled).toBe(true);
+    expect(askAgent).not.toHaveBeenCalled();
   });
 
   it('shows the notice when the AI is unavailable', async () => {
